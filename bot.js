@@ -11,49 +11,26 @@ if (!BOT_TOKEN || !ADMIN_CHAT_ID || !APP_URL) {
 }
 
 // ============================================================================
-// 🤖 BOT INITIALIZATION
+// 🤖 BOT INITIALIZATION - NO POLLING (Render doesn't like it)
 // ============================================================================
 
 const bot = new TelegramBot(BOT_TOKEN, {
-  polling: {
-    autoStart: false, // Don't auto-start - we'll start manually
-    params: { timeout: 10 }
-  }
+  polling: false // ✅ Disable polling - we'll use webhook in server.js instead
 });
 
-// Stop any previous polling
-bot.stopPolling().then(() => {
-  console.log("✅ Stopped previous polling");
-  // Start fresh polling
-  bot.startPolling();
-  console.log("✅ Started new polling");
-}).catch(() => {
-  // First time - no previous polling to stop
-  bot.startPolling();
-  console.log("✅ Started polling");
-});
-
-bot.getMe().then(() => {
-  console.log("✅ Bot connected successfully");
+bot.getMe().then((me) => {
+  console.log(`✅ Bot connected: @${me.username}`);
 }).catch(err => {
   console.error("❌ Bot connection failed:", err.message);
 });
 
 // ============================================================================
-// 🔘 ALL MESSAGE HANDLER - Debug
-// ============================================================================
-
-bot.on("message", (msg) => {
-  console.log("📨 Message received:", msg.text);
-});
-
-// ============================================================================
-// 🔘 CALLBACK HANDLERS
+// 🔘 CALLBACK HANDLER - Called from server.js webhook
 // ============================================================================
 
 const handledCallbacks = new Set();
 
-bot.on("callback_query", async (query) => {
+async function handleCallbackQuery(query) {
   const callbackId = query.id;
   console.log(`\n🔘 CALLBACK QUERY RECEIVED!`);
   console.log(`   Callback ID: ${callbackId}`);
@@ -105,11 +82,11 @@ bot.on("callback_query", async (query) => {
       show_alert: true
     }).catch(() => {});
   }
-});
+}
 
 console.log(`\n${"=".repeat(60)}`);
-console.log(`✅ BOT.JS RUNNING`);
-console.log(`📍 Listening for Telegram callbacks...`);
+console.log(`✅ BOT.JS READY (Webhook mode - no polling)`);
+console.log(`📍 Waiting for callbacks from server.js...`);
 console.log(`${"=".repeat(60)}\n`);
 
-module.exports = { bot };
+module.exports = { bot, handleCallbackQuery };
