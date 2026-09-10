@@ -4,13 +4,39 @@ const bodyParser = require("body-parser");
 const fetch = require("node-fetch");
 
 // ✅ Import the bot
-const { bot } = require("./bot");
+const { bot, handleCallbackQuery } = require("./bot");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(bodyParser.json());
+
+// ============================================================================
+// 🔔 WEBHOOK ENDPOINT - Telegram sends updates here
+// ============================================================================
+
+app.post("/webhook", express.json(), async (req, res) => {
+  try {
+    console.log("📨 Webhook update received");
+    
+    // Handle callback queries (button clicks)
+    if (req.body.callback_query) {
+      console.log("🔘 Button click detected");
+      await handleCallbackQuery(req.body.callback_query);
+    }
+    
+    // Handle messages
+    if (req.body.message) {
+      console.log("💬 Message received:", req.body.message.text);
+    }
+    
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("❌ Webhook error:", err);
+    res.status(500).json({ error: "Webhook processing failed" });
+  }
+});
 
 // ============================================================================
 // 🔍 DETECTION FUNCTIONS (Backend only - NOT exposed in frontend)
