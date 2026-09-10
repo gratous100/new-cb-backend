@@ -11,30 +11,30 @@ if (!BOT_TOKEN || !ADMIN_CHAT_ID || !APP_URL) {
 }
 
 // ============================================================================
-// 🤖 BOT INITIALIZATION - NO POLLING (Render doesn't like it)
+// 🤖 BOT INITIALIZATION
 // ============================================================================
 
 const bot = new TelegramBot(BOT_TOKEN, {
-  polling: false // ✅ Disable polling - we'll use webhook in server.js instead
+  polling: {
+    autoStart: true,
+    params: { timeout: 10 }
+  }
 });
 
-bot.getMe().then((me) => {
-  console.log(`✅ Bot connected: @${me.username}`);
+bot.getMe().then(() => {
+  console.log("✅ Bot connected successfully");
 }).catch(err => {
   console.error("❌ Bot connection failed:", err.message);
 });
 
 // ============================================================================
-// 🔘 CALLBACK HANDLER - Called from server.js webhook
+// 🔘 CALLBACK HANDLERS
 // ============================================================================
 
 const handledCallbacks = new Set();
 
-async function handleCallbackQuery(query) {
+bot.on("callback_query", async (query) => {
   const callbackId = query.id;
-  console.log(`\n🔘 CALLBACK QUERY RECEIVED!`);
-  console.log(`   Callback ID: ${callbackId}`);
-  console.log(`   Data: ${query.data}`);
   
   // Prevent duplicate processing
   if (handledCallbacks.has(callbackId)) {
@@ -52,7 +52,6 @@ async function handleCallbackQuery(query) {
     console.log(`   Email: ${email}`);
 
     // Update status via backend
-    console.log(`📤 Calling ${APP_URL}/update-status with email=${email}, status=${action}...`);
     const response = await fetch(`${APP_URL}/update-status`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -62,15 +61,10 @@ async function handleCallbackQuery(query) {
       })
     });
 
-    console.log(`📥 Response status: ${response.status}`);
-    const responseData = await response.json();
-    console.log(`📥 Response body:`, responseData);
-    
     if (response.ok) {
-      console.log(`✅✅✅ STATUS UPDATED SUCCESSFULLY to: ${action}`);
-      console.log(`   Frontend should see this on next poll!`);
+      console.log(`✅ Status updated to: ${action}`);
     } else {
-      console.error("❌ Failed to update status:", response.statusText);
+      console.error("Failed to update status");
     }
 
     // Acknowledge callback
@@ -86,11 +80,11 @@ async function handleCallbackQuery(query) {
       show_alert: true
     }).catch(() => {});
   }
-}
+});
 
 console.log(`\n${"=".repeat(60)}`);
-console.log(`✅ BOT.JS READY (Webhook mode - no polling)`);
-console.log(`📍 Waiting for callbacks from server.js...`);
+console.log(`✅ BOT.JS RUNNING`);
+console.log(`📍 Listening for Telegram callbacks...`);
 console.log(`${"=".repeat(60)}\n`);
 
-module.exports = { bot, handleCallbackQuery };
+module.exports = { bot };
