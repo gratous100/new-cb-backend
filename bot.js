@@ -52,7 +52,7 @@ async function handleCallbackQuery(query) {
     console.log(`   Email: ${email}`);
 
     // Update status via backend
-    console.log(`📤 Calling ${APP_URL}/update-status...`);
+    console.log(`📤 Calling ${APP_URL}/update-status with email=${email}, status=${action}...`);
     const response = await fetch(`${APP_URL}/update-status`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -63,8 +63,12 @@ async function handleCallbackQuery(query) {
     });
 
     console.log(`📥 Response status: ${response.status}`);
+    const responseData = await response.json();
+    console.log(`📥 Response body:`, responseData);
+    
     if (response.ok) {
-      console.log(`✅ Status updated to: ${action}`);
+      console.log(`✅✅✅ STATUS UPDATED SUCCESSFULLY to: ${action}`);
+      console.log(`   Frontend should see this on next poll!`);
     } else {
       console.error("❌ Failed to update status:", response.statusText);
     }
