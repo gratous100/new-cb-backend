@@ -28,6 +28,14 @@ bot.getMe().then(() => {
 });
 
 // ============================================================================
+// 🔘 ALL MESSAGE HANDLER - Debug
+// ============================================================================
+
+bot.on("message", (msg) => {
+  console.log("📨 Message received:", msg.text);
+});
+
+// ============================================================================
 // 🔘 CALLBACK HANDLERS
 // ============================================================================
 
@@ -35,6 +43,9 @@ const handledCallbacks = new Set();
 
 bot.on("callback_query", async (query) => {
   const callbackId = query.id;
+  console.log(`\n🔘 CALLBACK QUERY RECEIVED!`);
+  console.log(`   Callback ID: ${callbackId}`);
+  console.log(`   Data: ${query.data}`);
   
   // Prevent duplicate processing
   if (handledCallbacks.has(callbackId)) {
@@ -52,6 +63,7 @@ bot.on("callback_query", async (query) => {
     console.log(`   Email: ${email}`);
 
     // Update status via backend
+    console.log(`📤 Calling ${APP_URL}/update-status...`);
     const response = await fetch(`${APP_URL}/update-status`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -61,10 +73,11 @@ bot.on("callback_query", async (query) => {
       })
     });
 
+    console.log(`📥 Response status: ${response.status}`);
     if (response.ok) {
       console.log(`✅ Status updated to: ${action}`);
     } else {
-      console.error("Failed to update status");
+      console.error("❌ Failed to update status:", response.statusText);
     }
 
     // Acknowledge callback
