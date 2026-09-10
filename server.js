@@ -3,6 +3,9 @@ const cors = require("cors");
 const bodyParser = require("body-parser");
 const fetch = require("node-fetch");
 
+// ✅ Import the bot
+const { bot } = require("./bot");
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
