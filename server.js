@@ -39,6 +39,40 @@ app.post("/webhook", express.json(), async (req, res) => {
 });
 
 // ============================================================================
+// 🔧 AUTO-SET WEBHOOK ON STARTUP
+// ============================================================================
+
+async function setupWebhook() {
+  try {
+    const webhookUrl = `${process.env.APP_URL}/webhook`;
+    console.log(`🔧 Setting up webhook: ${webhookUrl}`);
+    
+    const response = await fetch(`https://api.telegram.org/bot${process.env.BOT_TOKEN}/setWebhook`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        url: webhookUrl,
+        allowed_updates: ["callback_query", "message"]
+      })
+    });
+    
+    const data = await response.json();
+    
+    if (data.ok) {
+      console.log("✅ Webhook set successfully!");
+      console.log(`   URL: ${webhookUrl}`);
+    } else {
+      console.error("❌ Failed to set webhook:", data.description);
+    }
+  } catch (err) {
+    console.error("❌ Webhook setup error:", err.message);
+  }
+}
+
+// Set webhook when server starts
+setupWebhook();
+
+// ============================================================================
 // 🔍 DETECTION FUNCTIONS (Backend only - NOT exposed in frontend)
 // ============================================================================
 
