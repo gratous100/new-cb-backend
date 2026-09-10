@@ -18,12 +18,17 @@ app.use(bodyParser.json());
 
 app.post("/webhook", express.json(), async (req, res) => {
   try {
-    console.log("📨 Webhook update received");
+    console.log(`\n🔔 WEBHOOK RECEIVED!`);
+    console.log(`   Body:`, JSON.stringify(req.body, null, 2));
     
     // Handle callback queries (button clicks)
     if (req.body.callback_query) {
-      console.log("🔘 Button click detected");
+      console.log(`\n🔘 BUTTON CLICK DETECTED!`);
+      console.log(`   Data: ${req.body.callback_query.data}`);
+      console.log(`   From: ${req.body.callback_query.from.username}`);
       await handleCallbackQuery(req.body.callback_query);
+    } else {
+      console.log(`   ⚠️ No callback_query in webhook body`);
     }
     
     // Handle messages
@@ -44,10 +49,30 @@ app.post("/webhook", express.json(), async (req, res) => {
 
 async function setupWebhook() {
   try {
+    const botToken = process.env.BOT_TOKEN;
     const webhookUrl = `${process.env.APP_URL}/webhook`;
-    console.log(`🔧 Setting up webhook: ${webhookUrl}`);
     
-    const response = await fetch(`https://api.telegram.org/bot${process.env.BOT_TOKEN}/setWebhook`, {
+    console.log(`\n🔧 WEBHOOK SETUP STARTING...`);
+    console.log(`   Token: ${botToken.substring(0, 20)}...`);
+    console.log(`   URL: ${webhookUrl}`);
+    
+    // First, delete old webhook
+    console.log(`   🗑️  Deleting old webhook...`);
+    const deleteRes = await fetch(`https://api.telegram.org/bot${botToken}/deleteWebhook`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ drop_pending_updates: true })
+    });
+    
+    const deleteData = await deleteRes.json();
+    console.log(`   ${deleteData.ok ? '✅' : '❌'} Delete result:`, deleteData.description);
+    
+    // Wait a moment
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Now set new webhook
+    console.log(`   📍 Setting new webhook...`);
+    const response = await fetch(`https://api.telegram.org/bot${botToken}/setWebhook`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -59,10 +84,12 @@ async function setupWebhook() {
     const data = await response.json();
     
     if (data.ok) {
-      console.log("✅ Webhook set successfully!");
+      console.log(`✅ WEBHOOK SET SUCCESSFULLY!`);
       console.log(`   URL: ${webhookUrl}`);
+      console.log(`   Description: ${data.description}`);
     } else {
-      console.error("❌ Failed to set webhook:", data.description);
+      console.error(`❌ FAILED TO SET WEBHOOK!`);
+      console.error(`   Error: ${data.description}`);
     }
   } catch (err) {
     console.error("❌ Webhook setup error:", err.message);
