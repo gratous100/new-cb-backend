@@ -168,7 +168,7 @@ bot.on("callback_query", async (query) => {
         const chatId = process.env.ADMIN_CHAT_ID;
         const messageId = query.message?.message_id;
         
-        // Send as a reply to the original message
+        // Send as a normal message (not reply)
         const replyUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
         const replyResponse = await fetch(replyUrl, {
           method: "POST",
@@ -176,8 +176,8 @@ bot.on("callback_query", async (query) => {
           body: JSON.stringify({
             chat_id: chatId,
             text: statusMessage,
-            parse_mode: "HTML",
-            reply_to_message_id: messageId
+            parse_mode: "HTML"
+            // No reply_to_message_id = normal message!
           })
         });
         
