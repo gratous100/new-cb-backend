@@ -40,17 +40,16 @@ bot.on("callback_query", async (query) => {
     });
 
     if (response.ok) {
-      // Remove buttons from original message
+      // Remove buttons from original message by editing reply_markup
       try {
-        const editUrl = `https://api.telegram.org/bot${BOT_TOKEN}/editMessageText`;
+        const editUrl = `https://api.telegram.org/bot${BOT_TOKEN}/editMessageReplyMarkup`;
         await fetch(editUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             chat_id: ADMIN_CHAT_ID,
             message_id: query.message?.message_id,
-            text: query.message?.text,
-            parse_mode: "HTML"
+            reply_markup: JSON.stringify({ inline_keyboard: [] })  // ✅ Empty buttons!
           })
         });
       } catch (err) {}
