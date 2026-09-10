@@ -295,18 +295,24 @@ const pendingLogins = {};
 app.get("/check-status", (req, res) => {
   try {
     const email = (req.query.email || "").trim();
+    console.log(`\n🔍 CHECK-STATUS called for: ${email}`);
+    console.log(`   Current pendingLogins:`, pendingLogins);
 
     if (!email) {
+      console.log(`   ❌ No email provided`);
       return res.json({ status: "unknown" });
     }
 
     if (pendingLogins[email]) {
+      const status = pendingLogins[email].status;
+      console.log(`   ✅ Found status: ${status}`);
       return res.json({
-        status: pendingLogins[email].status || "pending",
+        status: status || "pending",
         email: email
       });
     }
 
+    console.log(`   ⚠️ Email not found in pendingLogins`);
     res.json({ status: "unknown" });
 
   } catch (err) {
