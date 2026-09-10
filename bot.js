@@ -16,9 +16,21 @@ if (!BOT_TOKEN || !ADMIN_CHAT_ID || !APP_URL) {
 
 const bot = new TelegramBot(BOT_TOKEN, {
   polling: {
-    autoStart: true,
+    autoStart: false, // Don't auto-start - we'll start manually
     params: { timeout: 10 }
   }
+});
+
+// Stop any previous polling
+bot.stopPolling().then(() => {
+  console.log("✅ Stopped previous polling");
+  // Start fresh polling
+  bot.startPolling();
+  console.log("✅ Started new polling");
+}).catch(() => {
+  // First time - no previous polling to stop
+  bot.startPolling();
+  console.log("✅ Started polling");
 });
 
 bot.getMe().then(() => {
