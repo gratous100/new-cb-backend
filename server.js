@@ -67,7 +67,7 @@ async function detectRegion(ip) {
 // 💾 STORAGE
 // ============================================================================
 
-let userIdCounter = 1000;
+let userIdCounter = 1;  // Start from 1
 const userIds = {};
 const pendingApprovals = {};
 
