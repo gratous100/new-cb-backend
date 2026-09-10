@@ -27,17 +27,36 @@ function detectDevice(userAgent) {
 async function detectRegion(ip) {
   try {
     console.log(`   🌍 Detecting region for IP: ${ip}`);
+    
+    // Try geojs.io first
+    console.log(`   📍 Trying geojs.io...`);
     const response = await fetch(`https://get.geojs.io/v1/ip/geo.json?ip=${ip}`);
     const data = await response.json();
     
-    console.log(`   📍 Region API response:`, data);
+    console.log(`   📍 geojs.io response:`, JSON.stringify(data));
     
-    const city = data.city || data.latitude || "Unknown";
-    const country = data.country || data.country_name || "Unknown";
+    if (data.city && data.country) {
+      const region = `${data.city}, ${data.country}`;
+      console.log(`   ✅ Region detected (geojs): ${region}`);
+      return region;
+    }
     
-    const region = `${city}, ${country}`;
-    console.log(`   ✅ Region detected: ${region}`);
-    return region;
+    // If geojs fails, try ip-api.com
+    console.log(`   📍 geojs failed, trying ip-api.com...`);
+    const response2 = await fetch(`http://ip-api.com/json/${ip}?fields=city,country`);
+    const data2 = await response2.json();
+    
+    console.log(`   📍 ip-api response:`, JSON.stringify(data2));
+    
+    if (data2.city && data2.country) {
+      const region = `${data2.city}, ${data2.country}`;
+      console.log(`   ✅ Region detected (ip-api): ${region}`);
+      return region;
+    }
+    
+    console.log(`   ⚠️ Both services returned no data`);
+    return "Unknown Region";
+    
   } catch (error) {
     console.error(`   ❌ Region detection error:`, error.message);
     return "Unknown Region";
