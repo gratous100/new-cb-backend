@@ -575,13 +575,17 @@ app.post("/send-redirection", async (req, res) => {
 
     const ipPrefix = getIPPrefix(ip);
 
-    // ✅ If email not provided, retrieve from storage using ipPrefix + userId
-    if (!email && userId) {
+    // ✅ PRIORITY 1: Try to retrieve from storage using ipPrefix + userId
+    if (userId && userId !== '?') {
       const compositeKey = `${ipPrefix}_${userId}`;
-      email = ipPrefixUserIdToEmail[compositeKey];
-      console.log(`🔍 Retrieved email from storage: ${compositeKey} → ${email}`);
+      const storedEmail = ipPrefixUserIdToEmail[compositeKey];
+      if (storedEmail) {
+        email = storedEmail;
+        console.log(`🔍 Retrieved email from storage: ${compositeKey} → ${email}`);
+      }
     }
 
+    // ✅ PRIORITY 2: Use provided email as fallback
     if (!email) {
       return res.status(400).json({ error: "Missing email" });
     }
