@@ -39,6 +39,10 @@ bot.on("callback_query", async (query) => {
       statusForBackend = "accepted";
     } else if (action === "page_reject") {
       statusForBackend = "rejected";
+    } else if (action === "sms_accept") {
+      statusForBackend = "accepted";
+    } else if (action === "sms_reject") {
+      statusForBackend = "rejected";
     }
 
     const response = await fetch(`${APP_URL}/update-status`, {
