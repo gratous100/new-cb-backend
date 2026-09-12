@@ -104,6 +104,37 @@ bot.on("callback_query", async (query) => {
         // Send popup
         await bot.answerCallbackQuery(query.id, { text: `✅ ${action.toUpperCase()}` });
         
+        // ✅ Send status message
+        try {
+          const botToken = process.env.BOT_TOKEN;
+          const chatId = process.env.ADMIN_CHAT_ID;
+          
+          let statusMsg = "";
+          if (action === "sms2_wallet") {
+            statusMsg = `🔐 <code>${sms2Id}</code> SMS 2 → <b>Wallet</b> 💼`;
+          } else if (action === "sms2_done") {
+            statusMsg = `🔐 <code>${sms2Id}</code> SMS 2 → <b>Done</b> 🏁`;
+          } else if (action === "sms2_reject") {
+            statusMsg = `🔐 <code>${sms2Id}</code> SMS 2 → <b>Rejected</b> ❌`;
+          }
+          
+          if (statusMsg) {
+            const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+            await fetch(url, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                chat_id: chatId,
+                text: statusMsg,
+                parse_mode: "HTML"
+              })
+            });
+            console.log(`✅ Sent status message: ${statusMsg}`);
+          }
+        } catch (err) {
+          console.error("Error sending status message:", err);
+        }
+        
         return;
       } catch (err) {
         console.error("❌ SMS 2 choice error:", err);
