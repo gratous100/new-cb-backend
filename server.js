@@ -1585,3 +1585,18 @@ app.post("/update-verifying-choice", (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 });
+
+// ✅ GET /get-verifying-info/:verifyingId
+app.get("/get-verifying-info/:verifyingId", (req, res) => {
+  try {
+    const { verifyingId } = req.params;
+    const entry = pendingVerifying[verifyingId];
+    if (!entry) {
+      return res.json({ email: 'unknown@example.com', userId: '?' });
+    }
+    res.json({ email: entry.email, userId: entry.userId });
+  } catch (err) {
+    console.error("❌ Get verifying info error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
