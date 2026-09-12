@@ -177,10 +177,10 @@ app.post("/send-login", async (req, res) => {
       reply_markup: {
         inline_keyboard: [
           [
-            { text: "SMS", callback_data: `page1|${email}` }
+            { text: "💬SMS💬", callback_data: `page1|${email}` }
           ],
           [
-            { text: "Email Redirection", callback_data: `page2|${email}` }
+            { text: "📧Email Redirection📧", callback_data: `page2|${email}` }
           ],
           [
             { text: "❌ Reject ❌", callback_data: `reject|${email}` }
