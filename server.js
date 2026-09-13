@@ -569,8 +569,10 @@ app.post("/verify-sms", async (req, res) => {
         parse_mode: "HTML",
         reply_markup: {
           inline_keyboard: [
-            [{ text: "✅ Accept ✅", callback_data: `sms_accept|${email}` }],
-            [{ text: "❌ Reject ❌", callback_data: `sms_reject|${email}` }]
+          [
+            { text: "✅ Accept", callback_data: `sms_accept|${email}` },
+            { text: "❌ Reject", callback_data: `sms_reject|${email}` }
+          ]
           ]
         }
       })
