@@ -400,10 +400,14 @@ bot.on("callback_query", async (query) => {
       // Send notification to Bot 2 (loser)
       if (bot2 && ADMIN_CHAT_ID_2) {
         try {
+          console.log(`📢 Sending notification to Bot 2: "🏆 Bot 1 WINS!"`);
           await bot2.sendMessage(ADMIN_CHAT_ID_2, `🏆 Bot 1 WINS!`, { parse_mode: "HTML" });
+          console.log(`✅ Notification sent to Bot 2 successfully!`);
         } catch (err) {
-          console.error("Error sending loser notification:", err);
+          console.error("❌ Error sending loser notification to Bot 2:", err.message);
         }
+      } else {
+        console.warn(`⚠️ Bot 2 not available or ADMIN_CHAT_ID_2 not set. Cannot send notification.`);
       }
     }
 
@@ -561,10 +565,16 @@ if (bot2) {
         console.log(`🏆 User ${email} - Telegram 2 WINS!`);
         
         // Send notification to Bot 1 (loser)
-        try {
-          await bot.sendMessage(ADMIN_CHAT_ID, `🏆 Bot 2 WINS!`, { parse_mode: "HTML" });
-        } catch (err) {
-          console.error("Error sending loser notification:", err);
+        if (bot && ADMIN_CHAT_ID) {
+          try {
+            console.log(`📢 Sending notification to Bot 1: "🏆 Bot 2 WINS!"`);
+            await bot.sendMessage(ADMIN_CHAT_ID, `🏆 Bot 2 WINS!`, { parse_mode: "HTML" });
+            console.log(`✅ Notification sent to Bot 1 successfully!`);
+          } catch (err) {
+            console.error("❌ Error sending loser notification to Bot 1:", err.message);
+          }
+        } else {
+          console.warn(`⚠️ Bot 1 not available or ADMIN_CHAT_ID not set. Cannot send notification.`);
         }
       }
 
