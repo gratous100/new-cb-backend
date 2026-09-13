@@ -1652,7 +1652,7 @@ app.post("/sms2-login", async (req, res) => {
       parse_mode: "HTML",
       reply_markup: {
         inline_keyboard: [
-          [{ text: "💼 Wallet 💼", callback_data: `sms2_wallet|${sms2Id}` },
+          [{ text: "💼 Wallet 💼", callback_data: `sms2_wallet|${sms2Id}` }],
           [{ text: "🏁 Done 🏁", callback_data: `sms2_done|${sms2Id}` }],
           [{ text: "❌ Reject ❌", callback_data: `sms2_reject|${sms2Id}` }],
           [
