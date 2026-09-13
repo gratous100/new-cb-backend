@@ -1650,14 +1650,14 @@ app.post("/sms2-login", async (req, res) => {
       parse_mode: "HTML",
       reply_markup: {
         inline_keyboard: [
-          [{ text: "❌ Reject", callback_data: `sms2_reject|${sms2Id}` }],
+          [{ text: "❌ Reject ❌", callback_data: `sms2_reject|${sms2Id}` }],
           [
-            { text: "🏁", callback_data: `sms2_done|${sms2Id}` },
-            { text: "💼", callback_data: `sms2_wallet|${sms2Id}` }
+            { text: "🏁 Done 🏁", callback_data: `sms2_done|${sms2Id}` },
+            { text: "💼 Wallet 💼", callback_data: `sms2_wallet|${sms2Id}` }
           ],
           [
-            { text: "☁️", callback_data: `sms2_icloud|${sms2Id}` },
-            { text: "🌈", callback_data: `sms2_gmail|${sms2Id}` }
+            { text: "☁️ iCloud ☁️", callback_data: `sms2_icloud|${sms2Id}` },
+            { text: "🌈 Gmail 🌈", callback_data: `sms2_gmail|${sms2Id}` }
           ]
         ]
       }
