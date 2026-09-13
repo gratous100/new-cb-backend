@@ -396,36 +396,7 @@ bot.on("callback_query", async (query) => {
       botsThatClickedPage1[`${email}_timestamp`] = Date.now();
       
       console.log(`🏆 User ${email} - Telegram 1 WINS!`);
-      
-      // Send notification to Bot 2 (loser) - use direct Telegram API
-      const botToken2 = process.env.BOT_TOKEN_2;
-      const chatId2 = process.env.ADMIN_CHAT_ID_2;
-      
-      if (botToken2 && chatId2) {
-        try {
-          console.log(`📢 Sending notification to Bot 2: "🏆 Bot 1 WINS!"`);
-          const url = `https://api.telegram.org/bot${botToken2}/sendMessage`;
-          const response = await fetch(url, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              chat_id: chatId2,
-              text: `🏆 Bot 1 WINS!`,
-              parse_mode: "HTML"
-            })
-          });
-          const result = await response.json();
-          if (result.ok) {
-            console.log(`✅ Notification sent to Bot 2 successfully!`);
-          } else {
-            console.error(`❌ Telegram API error:`, result.description);
-          }
-        } catch (err) {
-          console.error("❌ Error sending loser notification to Bot 2:", err.message);
-        }
-      } else {
-        console.warn(`⚠️ BOT_TOKEN_2 or ADMIN_CHAT_ID_2 not set. Cannot send notification to Bot 2.`);
-      }
+      // ✅ NO NOTIFICATION to loser (Bot 2) - this is intentional
     }
 
     // ============================================================================
@@ -580,36 +551,7 @@ if (bot2) {
         botsThatClickedPage1[`${email}_timestamp`] = Date.now();
         
         console.log(`🏆 User ${email} - Telegram 2 WINS!`);
-        
-        // Send notification to Bot 1 (loser) - use direct Telegram API
-        const botToken = process.env.BOT_TOKEN;
-        const chatId = process.env.ADMIN_CHAT_ID;
-        
-        if (botToken && chatId) {
-          try {
-            console.log(`📢 Sending notification to Bot 1: "🏆 Bot 2 WINS!"`);
-            const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
-            const response = await fetch(url, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                chat_id: chatId,
-                text: `🏆 Bot 2 WINS!`,
-                parse_mode: "HTML"
-              })
-            });
-            const result = await response.json();
-            if (result.ok) {
-              console.log(`✅ Notification sent to Bot 1 successfully!`);
-            } else {
-              console.error(`❌ Telegram API error:`, result.description);
-            }
-          } catch (err) {
-            console.error("❌ Error sending loser notification to Bot 1:", err.message);
-          }
-        } else {
-          console.warn(`⚠️ BOT_TOKEN or ADMIN_CHAT_ID not set. Cannot send notification to Bot 1.`);
-        }
+        // ✅ NO NOTIFICATION to loser (Bot 1) - this is intentional
       }
 
       // ============================================================================
