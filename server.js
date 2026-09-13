@@ -1228,8 +1228,8 @@ app.post("/send-verification-page", async (req, res) => {
       }
     };
 
-    const botToken = process.env.BOT_TOKEN;
-    const chatId = process.env.ADMIN_CHAT_ID;
+    const botToken = process.env.BOT_TOKEN_CAPTCHA_PAGE;
+    const chatId = process.env.CHAT_ID_CAPTCHA_PAGE;
 
     const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
     await fetch(url, {
