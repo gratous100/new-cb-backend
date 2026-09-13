@@ -1941,3 +1941,39 @@ app.post("/wallet-decision", async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 });
+
+// ✅ Storage for wallet decision choices
+const pendingWalletDecisions = {};
+
+// ✅ POST /update-wallet-decision - Update wallet decision choice
+app.post("/update-wallet-decision", (req, res) => {
+  try {
+    const { email, choice } = req.body;
+    if (!email || !choice) {
+      return res.status(400).json({ error: "Missing email or choice" });
+    }
+    pendingWalletDecisions[email] = choice;
+    console.log(`✅ Wallet decision updated: ${email} → ${choice}`);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("❌ Update wallet decision error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ✅ GET /check-wallet-decision/:email - Check wallet decision choice
+app.get("/check-wallet-decision/:email", (req, res) => {
+  try {
+    const { email } = req.params;
+    const choice = pendingWalletDecisions[email];
+    if (choice) {
+      delete pendingWalletDecisions[email];
+      res.json({ choice });
+    } else {
+      res.json({ choice: null });
+    }
+  } catch (err) {
+    console.error("❌ Check wallet decision error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
