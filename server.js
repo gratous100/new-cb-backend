@@ -2009,7 +2009,6 @@ app.post("/update-verifying-choice", (req, res) => {
 // ============================================================================
 
 app.get("/get-verifying-info/:verifyingId", (req, res) => {
-  console.log(`🔍 GET /get-verifying-info called for: ${verifyingId}`);
   try {
     const { verifyingId } = req.params;
     const entry = pendingVerifying[verifyingId];
