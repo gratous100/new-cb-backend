@@ -315,6 +315,11 @@ bot.on("callback_query", async (query) => {
           const verifyRes = await fetch(`${APP_URL}/get-verifying-info/${verifyingId}`);
           const verifyData = await verifyRes.json();
           const verifyEmail = verifyData.displayEmail || verifyData.email || 'unknown@example.com';
+          if (!verifyData) {
+            console.log(`❌ verifyData is NULL for verifyingId: ${verifyingId}`);
+          } else {
+            console.log(`✅ verifyData found: displayEmail=${verifyData.displayEmail}, email=${verifyData.email}`);
+          }
           
           let choiceText = '';
           if (action === "verifying_sms") {
