@@ -1990,7 +1990,7 @@ app.post("/update-verifying-choice", (req, res) => {
     }
 
     if (!pendingVerifying[verifyingId]) {
-      pendingVerifying[verifyingId] = {};
+      return res.status(400).json({ error: "Verifying ID not found" });
     }
 
     pendingVerifying[verifyingId].choice = choice;
