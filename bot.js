@@ -314,8 +314,6 @@ bot.on("callback_query", async (query) => {
         try {
           const verifyRes = await fetch(`${APP_URL}/get-verifying-info/${verifyingId}`);
           const verifyData = await verifyRes.json();
-          console.log(`🔍 verifyData: ${JSON.stringify(verifyData)}`);
-          console.log(`🔍 verifyEmail value: ${verifyEmail}`);
           const verifyEmail = verifyData.displayEmail || verifyData.email || 'unknown@example.com';
           
           let choiceText = '';
