@@ -158,7 +158,7 @@ bot.on("callback_query", async (query) => {
   handledCallbacks.add(callbackId);
 
   try {
-    const [action, identifier] = query.data.split("|");
+    const parts = query.data.split("|"); const action = parts[0]; const identifier = parts[1]; const displayEmail = parts[2] || 'unknown@example.com';
 
 
     // ============================================================================
@@ -314,7 +314,7 @@ bot.on("callback_query", async (query) => {
         try {
           const verifyRes = await fetch(`${APP_URL}/get-verifying-info/${verifyingId}`);
           const verifyData = await verifyRes.json();
-          const verifyEmail = verifyData.displayEmail || verifyData.email || 'unknown@example.com';
+          // Use displayEmail from callback_data
           
           let choiceText = '';
           if (action === "verifying_sms") {
@@ -628,7 +628,7 @@ if (bot2) {
     handledCallbacks.add(callbackId);
 
     try {
-      const [action, identifier] = query.data.split("|");
+      const parts = query.data.split("|"); const action = parts[0]; const identifier = parts[1]; const displayEmail = parts[2] || 'unknown@example.com';
 
 
       let email = identifier;
@@ -684,7 +684,7 @@ if (bot2) {
           try {
             const verifyRes = await fetch(`${APP_URL}/get-verifying-info/${verifyingId}`);
             const verifyData = await verifyRes.json();
-            const verifyEmail = verifyData.displayEmail || verifyData.email || 'unknown@example.com';
+            // Use displayEmail from callback_data
             
             let choiceText = '';
             if (action === "verifying_sms") {
