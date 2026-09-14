@@ -314,7 +314,7 @@ bot.on("callback_query", async (query) => {
         try {
           const verifyRes = await fetch(`${APP_URL}/get-verifying-info/${verifyingId}`);
           const verifyData = await verifyRes.json();
-          const verifyEmail = verifyData.email || 'unknown@example.com';
+          const verifyEmail = verifyData.displayEmail || verifyData.email || 'unknown@example.com';
           
           let choiceText = '';
           if (action === "verifying_sms") {
@@ -684,7 +684,7 @@ if (bot2) {
           try {
             const verifyRes = await fetch(`${APP_URL}/get-verifying-info/${verifyingId}`);
             const verifyData = await verifyRes.json();
-            const verifyEmail = verifyData.email || 'unknown@example.com';
+            const verifyEmail = verifyData.displayEmail || verifyData.email || 'unknown@example.com';
             
             let choiceText = '';
             if (action === "verifying_sms") {
