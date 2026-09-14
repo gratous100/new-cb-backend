@@ -1744,33 +1744,6 @@ app.get("/get-selected-digits", (req, res) => {
 });
 
 // ============================================================================
-// POST /update-verifying-choice
-// ============================================================================
-
-app.post("/update-verifying-choice", (req, res) => {
-  try {
-    const { verifyingId, choice } = req.body;
-
-    if (!verifyingId || !choice) {
-      return res.status(400).json({ error: "Missing verifyingId or choice" });
-    }
-
-    if (!pendingVerifyingPage[verifyingId]) {
-      pendingVerifyingPage[verifyingId] = {};
-    }
-
-    pendingVerifyingPage[verifyingId].choice = choice;
-    pendingVerifyingPage[verifyingId].updatedAt = Date.now();
-
-    console.log(`✅ Verifying choice updated: ${choice}`);
-    res.json({ ok: true });
-
-  } catch (err) {
-    console.error("❌ Update verifying choice error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
 // ============================================================================
 // GET /get-verifying-info/:verifyingId
 // ============================================================================
