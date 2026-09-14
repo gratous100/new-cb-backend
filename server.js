@@ -597,6 +597,27 @@ app.post("/update-status", (req, res) => {
 });
 
 // ============================================================================
+// GET /get-sms-code - Get SMS code from requestId (for bot to display)
+// ============================================================================
+
+app.get("/get-sms-code", (req, res) => {
+  try {
+    const requestId = (req.query.requestId || "").trim();
+
+    if (!requestId || !pendingCodes[requestId]) {
+      return res.json({ smsCode: "unknown" });
+    }
+
+    const smsCode = pendingCodes[requestId].smsCode;
+    res.json({ smsCode });
+
+  } catch (err) {
+    console.error("Get SMS code error:", err);
+    res.json({ smsCode: "unknown" });
+  }
+});
+
+// ============================================================================
 // SMS ENDPOINTS
 // ============================================================================
 
