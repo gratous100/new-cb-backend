@@ -105,7 +105,7 @@ async function broadcastMessage(chatId, message, options = {}) {
 
   try {
     await bot.sendMessage(chatId, message, options);
-    console.log(`✅ Message sent to Bot 1 (Chat: ${chatId})`);
+    console.log(`✅ Message sent to Bot 1`);
   } catch (err) {
     console.error("❌ Failed to send to Bot 1:", err.message);
     errors.push(err);
@@ -114,7 +114,7 @@ async function broadcastMessage(chatId, message, options = {}) {
   if (bot2 && ADMIN_CHAT_ID_2) {
     try {
       await bot2.sendMessage(ADMIN_CHAT_ID_2, message, options);
-      console.log(`✅ Message sent to Bot 2 (Chat: ${ADMIN_CHAT_ID_2})`);
+      console.log(`✅ Message sent to Bot 2`);
     } catch (err) {
       console.error("❌ Failed to send to Bot 2:", err.message);
       errors.push(err);
