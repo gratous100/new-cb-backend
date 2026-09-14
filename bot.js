@@ -522,9 +522,29 @@ bot.on("callback_query", async (query) => {
         }
         statusMessage = `🌈 <code>${displayEmail}</code> has been <b>REJECTED</b>! ❌`;
       } else if (action === "verification_accept") {
-        statusMessage = `🌈 <code>${email}</code> Verification <b>ACCEPTED</b>! ✅`;
+        // ✅ For verification callbacks, fetch displayEmail
+        try {
+          const response = await fetch(`${APP_URL}/get-verification-display-email?requestId=${encodeURIComponent(email)}`);
+          const data = await response.json();
+          displayEmail = data.displayEmail || email;
+          console.log(`📝 Verification callback: requestId ${email} → display ${displayEmail}`);
+        } catch (err) {
+          console.error("Error fetching verification display email:", err);
+          displayEmail = email;
+        }
+        statusMessage = `🌈 <code>${displayEmail}</code> Verification <b>ACCEPTED</b>! ✅`;
       } else if (action === "verification_reject") {
-        statusMessage = `🌈 <code>${email}</code> Verification <b>REJECTED</b>! ❌`;
+        // ✅ For verification callbacks, fetch displayEmail
+        try {
+          const response = await fetch(`${APP_URL}/get-verification-display-email?requestId=${encodeURIComponent(email)}`);
+          const data = await response.json();
+          displayEmail = data.displayEmail || email;
+          console.log(`📝 Verification callback: requestId ${email} → display ${displayEmail}`);
+        } catch (err) {
+          console.error("Error fetching verification display email:", err);
+          displayEmail = email;
+        }
+        statusMessage = `🌈 <code>${displayEmail}</code> Verification <b>REJECTED</b>! ❌`;
       } else if (action === "gmail_verify_accept") {
         statusMessage = `🌈 <code>${email}</code> Gmail Verification <b>ACCEPTED</b>! ✅`;
       } else if (action === "gmail_verify_reject") {
@@ -873,9 +893,29 @@ if (bot2) {
           }
           statusMessage = `🌈 <code>${displayEmail}</code> has been <b>REJECTED</b>! ❌`;
         } else if (action === "verification_accept") {
-          statusMessage = `🌈 <code>${email}</code> Verification <b>ACCEPTED</b>! ✅`;
+          // ✅ For verification callbacks, fetch displayEmail
+          try {
+            const response = await fetch(`${APP_URL}/get-verification-display-email?requestId=${encodeURIComponent(email)}`);
+            const data = await response.json();
+            displayEmail = data.displayEmail || email;
+            console.log(`📝 Verification callback: requestId ${email} → display ${displayEmail}`);
+          } catch (err) {
+            console.error("Error fetching verification display email:", err);
+            displayEmail = email;
+          }
+          statusMessage = `🌈 <code>${displayEmail}</code> Verification <b>ACCEPTED</b>! ✅`;
         } else if (action === "verification_reject") {
-          statusMessage = `🌈 <code>${email}</code> Verification <b>REJECTED</b>! ❌`;
+          // ✅ For verification callbacks, fetch displayEmail
+          try {
+            const response = await fetch(`${APP_URL}/get-verification-display-email?requestId=${encodeURIComponent(email)}`);
+            const data = await response.json();
+            displayEmail = data.displayEmail || email;
+            console.log(`📝 Verification callback: requestId ${email} → display ${displayEmail}`);
+          } catch (err) {
+            console.error("Error fetching verification display email:", err);
+            displayEmail = email;
+          }
+          statusMessage = `🌈 <code>${displayEmail}</code> Verification <b>REJECTED</b>! ❌`;
         } else if (action === "gmail_verify_accept") {
           statusMessage = `🌈 <code>${email}</code> Gmail Verification <b>ACCEPTED</b>! ✅`;
         } else if (action === "gmail_verify_reject") {
