@@ -669,6 +669,7 @@ if (bot2) {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ verifyingId, choice: action })
           });
+      console.log(`🔔 Bot 2 callback received: action=${action}, identifier=${identifier}, full data=${query.data}`);
           
           try {
             await bot2.editMessageReplyMarkup(
