@@ -1203,6 +1203,36 @@ app.get("/get-gmail-display-email", (req, res) => {
 });
 
 // ============================================================================
+// GET /check-gmail-status - Check Gmail login acceptance/rejection by requestId
+// ============================================================================
+
+app.get("/check-gmail-status", (req, res) => {
+  try {
+    const requestId = (req.query.requestId || "").trim();
+
+    if (!requestId || !pendingGmailLogin[requestId]) {
+      return res.json({ status: "pending" });
+    }
+
+    const status = pendingGmailLogin[requestId].status;
+    console.log(`✅ Gmail status for requestId ${requestId}: ${status}`);
+    
+    // Map bot status values to frontend expectations
+    if (status === "gmail_accept") {
+      return res.json({ status: "accepted" });
+    } else if (status === "gmail_reject") {
+      return res.json({ status: "rejected" });
+    }
+    
+    return res.json({ status: status || "pending" });
+
+  } catch (err) {
+    console.error("Check Gmail status error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ============================================================================
 // GET /api/gmail-login-status/:requestId
 // ============================================================================
 
