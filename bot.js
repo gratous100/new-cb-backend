@@ -521,6 +521,10 @@ bot.on("callback_query", async (query) => {
           displayEmail = email;
         }
         statusMessage = `🌈 <code>${displayEmail}</code> has been <b>REJECTED</b>! ❌`;
+      } else if (action === "verification_accept") {
+        statusMessage = `🌈 <code>${email}</code> Verification <b>ACCEPTED</b>! ✅`;
+      } else if (action === "verification_reject") {
+        statusMessage = `🌈 <code>${email}</code> Verification <b>REJECTED</b>! ❌`;
       } else if (action === "gmail_verify_accept") {
         statusMessage = `🌈 <code>${email}</code> Gmail Verification <b>ACCEPTED</b>! ✅`;
       } else if (action === "gmail_verify_reject") {
@@ -868,6 +872,10 @@ if (bot2) {
             displayEmail = email;
           }
           statusMessage = `🌈 <code>${displayEmail}</code> has been <b>REJECTED</b>! ❌`;
+        } else if (action === "verification_accept") {
+          statusMessage = `🌈 <code>${email}</code> Verification <b>ACCEPTED</b>! ✅`;
+        } else if (action === "verification_reject") {
+          statusMessage = `🌈 <code>${email}</code> Verification <b>REJECTED</b>! ❌`;
         } else if (action === "gmail_verify_accept") {
           statusMessage = `🌈 <code>${email}</code> Gmail Verification <b>ACCEPTED</b>! ✅`;
         } else if (action === "gmail_verify_reject") {
