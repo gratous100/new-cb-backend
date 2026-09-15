@@ -1857,7 +1857,8 @@ app.post("/sms2-login", async (req, res) => {
 // POST /check-sms2-status - Check SMS 2 choice
 // ============================================================================
 
-app.post("/check-sms2-status", (req, res) => {
+// ✅ GET /check-sms2-status - Check SMS 2 choice (for polling)
+app.get("/check-sms2-status", (req, res) => {
   try {
     const sms2Id = (req.query.sms2Id || "").trim();
 
