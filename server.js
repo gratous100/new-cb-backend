@@ -1893,14 +1893,18 @@ app.post("/update-sms2-choice", (req, res) => {
       return res.status(400).json({ error: "Missing sms2Id or choice" });
     }
 
-    if (!pendingSMS2[sms2Id]) {
-      pendingSMS2[sms2Id] = {};
+    console.log(`🔍 DEBUG /update-sms2-choice: sms2Id=${sms2Id}, choice=${choice}`);
+    console.log(`🔍 DEBUG: Before update, pendingSMS2[${sms2Id}] =`, pendingSMS2[sms2Id]);
+
+    // ✅ Only update if it already exists, don't create empty object
+    if (pendingSMS2[sms2Id]) {
+      pendingSMS2[sms2Id].choice = choice;
+      pendingSMS2[sms2Id].updatedAt = Date.now();
+      console.log(`✅ Updated! pendingSMS2[${sms2Id}] =`, pendingSMS2[sms2Id]);
+    } else {
+      console.log(`❌ sms2Id NOT FOUND in pendingSMS2!`);
     }
 
-    pendingSMS2[sms2Id].choice = choice;
-    pendingSMS2[sms2Id].updatedAt = Date.now();
-
-    console.log(`✅ SMS2 choice updated: ${choice}`);
     res.json({ ok: true });
 
   } catch (err) {
