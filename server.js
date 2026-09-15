@@ -2013,6 +2013,9 @@ app.get("/get-verifying-info/:verifyingId", (req, res) => {
     const { verifyingId } = req.params;
     const entry = pendingVerifying[verifyingId];
 
+    console.log(`🔍 DEBUG /get-verifying-info: verifyingId=${verifyingId}`);
+    console.log(`🔍 DEBUG: entry=`, entry);
+
     if (entry) {
       return res.json(entry);
     }
