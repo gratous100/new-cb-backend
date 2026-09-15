@@ -1918,9 +1918,15 @@ app.get("/get-sms2-info/:sms2Id", (req, res) => {
     const { sms2Id } = req.params;
     const entry = pendingSMS2[sms2Id];
     
+    console.log(`🔍 DEBUG /get-sms2-info: sms2Id=${sms2Id}`);
+    console.log(`🔍 DEBUG: pendingSMS2[${sms2Id}] =`, entry);
+    
     if (entry) {
-      res.json({ email: entry.email || entry.displayEmail });
+      const email = entry.email || entry.displayEmail;
+      console.log(`✅ Found email: ${email}`);
+      res.json({ email });
     } else {
+      console.log(`❌ Entry not found`);
       res.json({ email: null });
     }
   } catch (err) {
