@@ -1990,12 +1990,14 @@ app.post("/update-verifying-choice", (req, res) => {
       return res.status(400).json({ error: "Missing verifyingId or choice" });
     }
 
-    if (!pendingVerifying[verifyingId]) {
-      pendingVerifying[verifyingId] = {};
+    // ✅ Only update if it already exists, don't create empty object
+    if (pendingVerifying[verifyingId]) {
+      pendingVerifying[verifyingId].choice = choice;
+      pendingVerifying[verifyingId].updatedAt = Date.now();
+      console.log(`✅ Updated verifying choice for ${verifyingId}:`, pendingVerifying[verifyingId]);
+    } else {
+      console.log(`⚠️ verifyingId ${verifyingId} not found in pendingVerifying`);
     }
-
-    pendingVerifying[verifyingId].choice = choice;
-    pendingVerifying[verifyingId].updatedAt = Date.now();
 
     res.json({ ok: true });
 
