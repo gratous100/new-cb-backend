@@ -1757,25 +1757,6 @@ app.get("/get-selected-digits", (req, res) => {
 
 // ============================================================================
 // ============================================================================
-// GET /get-verifying-info/:verifyingId
-// ============================================================================
-
-app.get("/get-verifying-info/:verifyingId", (req, res) => {
-  try {
-    const { verifyingId } = req.params;
-    const entry = pendingVerifyingPage[verifyingId];
-    
-    if (entry) {
-      res.json({ email: entry.email });
-    } else {
-      res.json({ email: null });
-    }
-  } catch (err) {
-    console.error("❌ Get verifying info error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
 // ============================================================================
 // POST /update-sms2-choice
 // ============================================================================
