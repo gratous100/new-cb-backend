@@ -241,9 +241,13 @@ bot.on("callback_query", async (query) => {
           const botToken = process.env.BOT_TOKEN;
           const chatId = process.env.ADMIN_CHAT_ID;
           
+          console.log(`🔍 BOT: Fetching SMS2 info for ${sms2Id}...`);
           const sms2Info = await fetch(`${APP_URL}/get-sms2-info/${sms2Id}`);
+          console.log(`🔍 BOT: Response status: ${sms2Info.status}`);
           const sms2Data = await sms2Info.json();
+          console.log(`🔍 BOT: Fetched data:`, sms2Data);
           const sms2Email = sms2Data.email || sms2Id;
+          console.log(`🔍 BOT: Final email to display: ${sms2Email}`);
           
           let statusMsg = "";
           if (action === "sms2_wallet") {
