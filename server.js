@@ -2014,15 +2014,20 @@ app.post("/update-verifying-choice", (req, res) => {
 app.get("/get-verifying-info/:verifyingId", (req, res) => {
   try {
     const { verifyingId } = req.params;
+    
+    console.log(`🔍 DEBUG /get-verifying-info: verifyingId=${verifyingId}`);
+    console.log(`🔍 DEBUG: ALL pendingVerifying keys:`, Object.keys(pendingVerifying));
+    console.log(`🔍 DEBUG: pendingVerifying[${verifyingId}] =`, pendingVerifying[verifyingId]);
+    console.log(`🔍 DEBUG: Full object:`, JSON.stringify(pendingVerifying[verifyingId], null, 2));
+    
     const entry = pendingVerifying[verifyingId];
 
-    console.log(`🔍 DEBUG /get-verifying-info: verifyingId=${verifyingId}`);
-    console.log(`🔍 DEBUG: entry=`, entry);
-
     if (entry) {
+      console.log(`✅ Found entry, returning:`, entry);
       return res.json(entry);
     }
 
+    console.log(`❌ Entry not found, returning null`);
     res.json(null);
 
   } catch (err) {
