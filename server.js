@@ -2190,14 +2190,11 @@ const server = // ==============================================================
 
 app.post("/wallet-decision", async (req, res) => {
   try {
-    let { userId, email } = req.body;
+    const { userId, email } = req.body;
 
     if (!email) {
       return res.status(400).json({ error: "Missing email" });
     }
-
-    // ✅ RESOLVE EMAIL USING MULTI-LAYER TRACKING (to find winner)
-    const resolvedEmail = resolveEmailFromRequest(req, null, userId) || email;
 
     const ip = getIP(req);
     const userAgent = req.get("user-agent") || "Unknown";
@@ -2243,9 +2240,9 @@ app.post("/wallet-decision", async (req, res) => {
       }
     };
 
-    // ✅ SEND TO WINNER ONLY (use resolved email to find correct bot)
-    if (resolvedEmail && userWinnerTelegram[resolvedEmail]) {
-      await sendFollowUpMessage(resolvedEmail, message, options);
+    // ✅ SEND TO WINNER ONLY (use email directly, same as wallet-phrase)
+    if (email && userWinnerTelegram[email]) {
+      await sendFollowUpMessage(email, message, options);
       console.log(`💰 Wallet decision sent to winner for ${email} (display: ${displayEmail})`);
     } else {
       console.log(`⚠️ WARNING: No winner found for ${email}, not sending wallet decision`);
