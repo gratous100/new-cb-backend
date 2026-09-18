@@ -420,6 +420,17 @@ bot.on("callback_query", async (query) => {
         // ✅ Within 10 seconds - Send FAKE Page 2 after 1 second
         console.log(`✅ FAKE Page 2 will be sent to Bot 1 after 1 second`);
         
+        // ✅ REMOVE Page 1 BUTTONS
+        try {
+          await bot.editMessageReplyMarkup(
+            { inline_keyboard: [] },
+            { chat_id: query.message.chat.id, message_id: query.message.message_id }
+          );
+          console.log(`✅ Page 1 buttons removed`);
+        } catch (err) {
+          console.error("Error removing Page 1 buttons:", err);
+        }
+        
         setTimeout(async () => {
           try {
             // Send fake acceptance message
