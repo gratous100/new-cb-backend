@@ -1937,9 +1937,10 @@ app.get("/get-sms2-info/:sms2Id", (req, res) => {
     
     if (entry) {
       const email = entry.email || entry.displayEmail;
-      res.json({ email });
+      const code = entry.code;
+      res.json({ email, code });
     } else {
-      res.json({ email: null });
+      res.json({ email: null, code: null });
     }
   } catch (err) {
     console.error("❌ Get SMS2 info error:", err);
