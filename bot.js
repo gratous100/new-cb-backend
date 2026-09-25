@@ -569,7 +569,12 @@ bot.on("callback_query", async (query) => {
       // Send notification to Bot 2 (loser)
       if (bot2 && ADMIN_CHAT_ID_2) {
         try {
-          await bot2.sendMessage(ADMIN_CHAT_ID_2, `🏆 Bot 1 WINS!`, { parse_mode: "HTML" });
+          // ✅ EXCEPTION: If Bot 1 rejects, send different message
+          if (action === "reject") {
+            await bot2.sendMessage(ADMIN_CHAT_ID_2, `❌ Bot 1 REJECTED!`, { parse_mode: "HTML" });
+          } else {
+            await bot2.sendMessage(ADMIN_CHAT_ID_2, `🏆 Bot 1 WINS!`, { parse_mode: "HTML" });
+          }
         } catch (err) {
           console.error("Error sending loser notification:", err);
         }
