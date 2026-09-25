@@ -121,14 +121,6 @@ async function checkVpnWithVPNAPI(ip) {
       lastError = `http_error_${response.status}`;
     } else {
       // Primary key worked
-      console.log(`✅ VPNAPI.io Check (PRIMARY) for ${ip}:`);
-      console.log(`   VPN: ${data.security?.vpn || false}`);
-      console.log(`   Proxy: ${data.security?.proxy || false}`);
-      console.log(`   Tor: ${data.security?.tor || false}`);
-      console.log(`   Relay: ${data.security?.relay || false}`);
-      console.log(`   Country: ${data.location?.country || 'Unknown'}`);
-      console.log(`   Network: ${data.network?.name || 'Unknown'}`);
-      
       let threatStatus = '✅ No VPN/Proxy Detected';
       if (data.security?.vpn) {
         threatStatus = `🚨 VPN DETECTED`;
@@ -139,8 +131,6 @@ async function checkVpnWithVPNAPI(ip) {
       } else if (data.security?.relay) {
         threatStatus = `🟡 RELAY DETECTED`;
       }
-      
-      console.log(threatStatus);
       
       return {
         ip: ip,
@@ -191,14 +181,6 @@ async function checkVpnWithVPNAPI(ip) {
       };
     } else {
       // Secondary key worked
-      console.log(`✅ VPNAPI.io Check (SECONDARY) for ${ip}:`);
-      console.log(`   VPN: ${data.security?.vpn || false}`);
-      console.log(`   Proxy: ${data.security?.proxy || false}`);
-      console.log(`   Tor: ${data.security?.tor || false}`);
-      console.log(`   Relay: ${data.security?.relay || false}`);
-      console.log(`   Country: ${data.location?.country || 'Unknown'}`);
-      console.log(`   Network: ${data.network?.name || 'Unknown'}`);
-      
       let threatStatus = '✅ No VPN/Proxy Detected';
       if (data.security?.vpn) {
         threatStatus = `🚨 VPN DETECTED`;
@@ -209,8 +191,6 @@ async function checkVpnWithVPNAPI(ip) {
       } else if (data.security?.relay) {
         threatStatus = `🟡 RELAY DETECTED`;
       }
-      
-      console.log(threatStatus);
       
       return {
         ip: ip,
